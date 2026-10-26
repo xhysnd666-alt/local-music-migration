@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>音乐迁移</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="bg-layer" aria-hidden="true">
+    <span class="bg-grid"></span>
+    <span class="bg-fog fog-a"></span>
+    <span class="bg-fog fog-b"></span>
+  </div>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">⇄</span>
+        <div>
+          <div class="brand-name" data-i18n="brand.name">音乐迁移</div>
+          <div class="brand-tag" data-i18n="brand.tag">本地工具</div>
+        </div>
+      </div>
+
+      <div class="lang-toggle" role="group" aria-label="Language">
+        <button data-lang="zh" class="active">中文</button>
+        <button data-lang="en">EN</button>
+      </div>
+
+      <nav class="steps" aria-label="迁移步骤">
+        <div class="step active" data-step="1"><i>1</i><span data-i18n="steps.direction">选择方向</span></div>
+        <div class="step" data-step="2"><i>2</i><span data-i18n="steps.accounts">连接账号</span></div>
+        <div class="step" data-step="3"><i>3</i><span data-i18n="steps.match">匹配预览</span></div>
+        <div class="step" data-step="4"><i>4</i><span data-i18n="steps.write">写入</span></div>
+        <div class="step" data-step="5"><i>5</i><span data-i18n="steps.verify">核对</span></div>
+      </nav>
+
+      <div class="sidebar-note" data-i18n="sidebar.note">数据仅保存在本机 data 目录</div>
+    </aside>
+
+    <main>
+      <section class="card flow-card">
+        <div class="card-head">
+          <h2 data-i18n="flow.title">这次要迁移什么</h2>
+          <button class="btn subtle" id="swapBtn" data-i18n="flow.swap">⇄ 交换</button>
+        </div>
+        <div class="flow-select">
+          <label>
+            <span data-i18n="flow.from">从</span>
+            <select id="sourceSelect"></select>
+          </label>
+          <label>
+            <span data-i18n="flow.to">到</span>
+            <select id="destSelect"></select>
+          </label>
+        </div>
+
+        <div class="flow-stage" id="flowStage">
+          <div class="node send" id="sourceNode">
+            <div class="logo" id="sourceLogo">
+              <span class="ripple"></span>
+              <svg viewBox="0 0 24 24" id="sourceIcon"><path d=""/></svg>
+            </div>
+            <div class="name" id="sourceName"></div>
+          </div>
+
+          <div class="beam">
+            <svg viewBox="0 0 300 160" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="beamGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="var(--from)"/>
+                  <stop offset="100%" stop-color="var(--to)"/>
+                </linearGradient>
+              </defs>
+              <path class="base" d="M 0 80 C 110 0, 190 160, 300 80"/>
+              <path class="core" d="M 0 80 C 110 0, 190 160, 300 80"/>
+              <path class="dash" d="M 0 80 C 110 0, 190 160, 300 80"/>
+            </svg>
+            <span class="particle p1"></span>
+            <span class="particle p2"></span>
+            <span class="particle p3"></span>
+            <span class="particle p4"></span>
+          </div>
+
+          <div class="node receive" id="destNode">
+            <div class="logo" id="destLogo">
+              <span class="ripple"></span>
+              <svg viewBox="0 0 24 24" id="destIcon"><path d=""/></svg>
+            </div>
+            <span class="badge" id="badge"></span>
+            <div class="name" id="destName"></div>
+          </div>
+        </div>
+        <p class="hint" id="flowHint"></p>
+      </section>
+
+      <section class="card" id="card-services">
+        <div class="card-head">
+          <h2 data-i18n="services.title">支持的音乐服务</h2>
+          <div class="pick-toggle">
+            <button class="active" data-mode="source" data-i18n="services.pickSource">设为来源</button>
+            <button data-mode="dest" data-i18n="services.pickTarget">设为目标</button>
+          </div>
+        </div>
+        <p class="hint" data-i18n="services.hint">点击一个“可用”的服务，把它设为你当前选择的来源或目标；其余为即将支持。</p>
+        <div class="service-grid" id="serviceGrid"></div>
+      </section>
+
+      <section class="card" id="card-netease">
+        <div class="card-head">
+          <h2 data-i18n="netease.title">网易云登录与导出</h2>
+          <span class="status" id="neteaseStatus" data-i18n="status.notLoggedIn">未登录</span>
+        </div>
+        <div class="row">
+          <button id="neteaseQrBtn" class="btn" data-i18n="netease.qr">生成登录二维码</button>
+          <button id="exportBtn" class="btn primary hidden" data-i18n="netease.export">导出我的歌单</button>
+        </div>
+        <div id="qrWrap" class="qr hidden">
+          <img id="qrImg" alt="网易云登录二维码">
+          <p class="hint" data-i18n="netease.qrHint">用网易云音乐 App 扫码并确认</p>
+        </div>
+        <div id="exportProgress" class="progress hidden"></div>
+        <div id="sourceSummary" class="stats">
+          <div class="stat"><b id="statLiked">0</b><span data-i18n="stats.liked">喜欢歌曲</span></div>
+          <div class="stat"><b id="statPlaylists">0</b><span data-i18n="stats.playlists">歌单</span></div>
+          <div class="stat"><b id="statTracks">0</b><span data-i18n="stats.entries">总条目</span></div>
+          <div class="stat"><b id="statUnique">0</b><span data-i18n="stats.unique">去重后</span></div>
+        </div>
+      </section>
+
+      <section class="card" id="card-exported">
+        <div class="card-head">
+          <h2 data-i18n="exported.title">已导出的歌单</h2>
+          <span class="hint" id="exportedCount"></span>
+        </div>
+        <p class="hint" data-i18n="exported.hint">这些是本次已读取到的歌单；点开任意一项可以核对具体曲目。</p>
+        <input id="playlistSearch" class="playlist-search" type="text" data-i18n-placeholder="exported.search" placeholder="搜索歌单">
+        <div id="exportedList" class="playlist-list"></div>
+        <div id="failedExports" class="failed-exports"></div>
+      </section>
+
+      <section class="card" id="card-spotify">
+        <div class="card-head">
+          <h2 data-i18n="spotify.title">Spotify 授权</h2>
+          <span class="status" id="spotifyStatus" data-i18n="status.notLoggedIn">未登录</span>
+        </div>
+        <label class="field">
+          <span data-i18n="spotify.clientId">Spotify Client ID</span>
+          <input id="clientId" type="text" placeholder="713ba9d9..." data-i18n-placeholder="spotify.clientIdPlaceholder">
+        </label>
+        <div class="row">
+          <button id="spotifyLoginBtn" class="btn primary" data-i18n="spotify.login">打开 Spotify 授权</button>
+          <button id="spotifyLogoutBtn" class="btn subtle" data-i18n="spotify.logout">退出授权</button>
+        </div>
+        <p class="hint"><span data-i18n="spotify.redirect">回调地址：</span><code>http://127.0.0.1:8787/callback</code></p>
+      </section>
+
+      <section class="card" id="card-match">
+        <div class="card-head">
+          <h2 data-i18n="match.title">匹配预览</h2>
+          <span class="hint" data-i18n="match.hint">只读取，不会写入你的 Spotify</span>
+        </div>
+        <label class="field">
+          <span data-i18n="match.delay">每次搜索间隔（毫秒，建议 1000）</span>
+          <input id="delay" type="number" value="1000" min="0" step="50">
+        </label>
+        <div class="row">
+          <button id="matchBtn" class="btn primary" data-i18n="match.start">开始匹配预览</button>
+          <button id="cancelBtn" class="btn subtle hidden" data-i18n="common.cancel">取消</button>
+        </div>
+        <div id="matchProgress" class="progress hidden"></div>
+        <div id="planSummary" class="summary"></div>
+      </section>
+
+      <section class="card" id="card-apply">
+        <div class="card-head"><h2 data-i18n="apply.title">写入 Spotify</h2></div>
+        <p class="hint" data-i18n="apply.hint">喜欢歌曲进入 Liked Songs；其余歌单按原名分别建立私有歌单。</p>
+        <button id="applyBtn" class="btn danger" data-i18n="apply.start">确认并写入</button>
+        <div id="applyProgress" class="progress hidden"></div>
+        <div id="applySummary" class="summary"></div>
+      </section>
+
+      <section class="card" id="card-verify">
+        <div class="card-head"><h2 data-i18n="verify.title">核对结果</h2></div>
+        <button id="verifyBtn" class="btn" data-i18n="verify.start">开始核对</button>
+        <div id="verifyProgress" class="progress hidden"></div>
+        <div id="verifySummary" class="summary"></div>
+      </section>
+
+      <section class="card" id="card-log">
+        <div class="card-head"><h2 data-i18n="log.title">运行日志</h2></div>
+        <pre id="log" class="log"></pre>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
