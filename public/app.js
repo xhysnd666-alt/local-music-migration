@@ -109,7 +109,7 @@ const I18N = {
     zh: "只匹配“已导出的歌单”中勾选的歌单；每批最多 700 首。",
     en: "Only selected playlists from “Exported playlists” are matched; each batch is limited to 700 tracks.",
   },
-  "match.delay": { zh: "每次搜索间隔（毫秒，至少 3000）", en: "Delay between searches (ms, 3000 minimum)" },
+  "match.delay": { zh: "搜索间隔（至少 3000 毫秒）", en: "Search interval (min 3000 ms)" },
   "match.start": { zh: "匹配所选歌单", en: "Match selected playlists" },
   "plan.unique": { zh: "本批曲目", en: "Batch tracks" },
   "plan.matched": { zh: "匹配成功", en: "Matched" },

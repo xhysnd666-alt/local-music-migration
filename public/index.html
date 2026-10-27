@@ -175,8 +175,14 @@
           <div class="match-action-info">
             <strong id="batchInfoBottom" data-i18n="batch.none">未选择歌单</strong>
             <label class="inline-field">
-              <span data-i18n="match.delay">搜索间隔（毫秒，至少 3000）</span>
-              <input id="delay" type="number" value="3000" min="3000" step="250">
+              <span data-i18n="match.delay">搜索间隔</span>
+              <select id="delay">
+                <option value="3000">3000 ms</option>
+                <option value="3750">3750 ms</option>
+                <option value="4500">4500 ms</option>
+                <option value="6000">6000 ms</option>
+                <option value="10000">10000 ms</option>
+              </select>
             </label>
           </div>
           <div class="row">

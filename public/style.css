@@ -811,7 +811,8 @@ code {
   color: var(--muted);
   font-size: 12px;
 }
-.inline-field input {
+.inline-field input,
+.inline-field select {
   width: 92px;
   padding: 7px 8px;
   font-size: 12px;
