@@ -197,6 +197,20 @@
         <div id="matchProgress" class="progress hidden"></div>
       </section>
 
+      <section class="card" id="card-review">
+        <div class="card-head section-head">
+          <div>
+            <span class="section-step">2b</span>
+            <h2 data-i18n="review.title">待确认歌曲</h2>
+          </div>
+          <span class="hint" id="reviewCount"></span>
+        </div>
+        <p class="hint" data-i18n="review.hint">系统找到了候选，但信心不足。选择正确的 Spotify 候选项后点“采用”，也可以跳过。</p>
+        <input id="reviewSearch" class="playlist-search" type="text" data-i18n-placeholder="review.search" placeholder="搜索待确认歌曲或歌手">
+        <div id="reviewList" class="review-list"></div>
+        <button id="loadMoreReviews" class="btn subtle hidden" data-i18n="common.loadMore">加载更多</button>
+      </section>
+
       <section class="card" id="card-write">
         <div class="card-head section-head">
           <div>

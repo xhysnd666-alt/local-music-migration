@@ -136,6 +136,19 @@ const I18N = {
   "track.status.review": { zh: "待确认", en: "Review" },
   "track.status.unmatched": { zh: "未找到", en: "Unmatched" },
   "track.status.not_matched": { zh: "未匹配", en: "Not matched" },
+  "review.title": { zh: "待确认歌曲", en: "Tracks to review" },
+  "review.hint": {
+    zh: "系统找到了候选，但信心不足。选择正确的 Spotify 候选项后点“采用”，也可以跳过。",
+    en: "A candidate was found but confidence was low. Choose the correct Spotify match and click “Use”, or skip it.",
+  },
+  "review.search": { zh: "搜索待确认歌曲或歌手", en: "Search tracks or artists to review" },
+  "review.count": { zh: "还有 {count} 首待确认", en: "{count} tracks to review" },
+  "review.source": { zh: "网易云原曲", en: "NetEase source" },
+  "review.candidate": { zh: "Spotify 候选", en: "Spotify candidate" },
+  "review.accept": { zh: "采用", en: "Use" },
+  "review.skip": { zh: "跳过", en: "Skip" },
+  "review.empty": { zh: "没有待确认歌曲了", en: "No tracks left to review" },
+  "review.saved": { zh: "已处理", en: "Saved" },
   "apply.title": { zh: "写入 Spotify", en: "Write to Spotify" },
   "apply.hint": {
     zh: "喜欢歌曲进入 Liked Songs；其余歌单按原名分别建立私有歌单。",
@@ -570,6 +583,7 @@ async function refreshState() {
   if (state.source) {
     await loadExportedPlaylists();
     await loadTrackRows(true);
+    await loadReviewItems(true);
   }
 }
 
@@ -815,6 +829,10 @@ let trackOffset = 0;
 let trackTotal = 0;
 let trackLoading = false;
 let trackSearchTimer = null;
+let reviewOffset = 0;
+let reviewTotal = 0;
+let reviewLoading = false;
+let reviewSearchTimer = null;
 
 function trackStatusLabel(status) {
   return t(`track.status.${status || "not_matched"}`);
@@ -859,6 +877,102 @@ async function loadTrackRows(reset = false) {
     log(t("log.loadStateFailed", { error: err.message }));
   } finally {
     trackLoading = false;
+  }
+}
+
+async function loadReviewItems(reset = false) {
+  if (reviewLoading) return;
+  reviewLoading = true;
+  try {
+    const query = ($("reviewSearch")?.value || "").trim();
+    if (reset) {
+      reviewOffset = 0;
+      $("reviewList").innerHTML = "";
+    }
+    const params = new URLSearchParams({
+      q: query,
+      offset: String(reviewOffset),
+      limit: "20",
+    });
+    const data = await api(`/api/review?${params.toString()}`);
+    reviewTotal = data.total;
+    $("reviewCount").textContent = t("review.count", { count: data.total });
+    if (!data.rows?.length && reset) {
+      $("reviewList").innerHTML = `<div class="playlist-empty">${t("review.empty")}</div>`;
+    } else {
+      $("reviewList").insertAdjacentHTML(
+        "beforeend",
+        (data.rows || [])
+          .map(
+            (row) => `
+            <div class="review-item" data-track-id="${escapeHtml(row.track_id)}">
+              <div class="review-source">
+                <small>${t("review.source")}</small>
+                <b>${escapeHtml(row.source.name)}</b>
+                <span>${escapeHtml((row.source.artists || []).join(" / "))} · ${escapeHtml((row.playlists || []).join(" / "))}</span>
+              </div>
+              <div class="review-choice">
+                <small>${t("review.candidate")}</small>
+                <select class="review-candidate">
+                  ${(row.candidates || [])
+                    .map(
+                      (candidate, index) =>
+                        `<option value="${index}">${escapeHtml(candidate.name)} — ${escapeHtml((candidate.artists || []).join(" / "))} (${Math.round((candidate.score || 0) * 100)}%)</option>`,
+                    )
+                    .join("")}
+                </select>
+                <div class="row">
+                  <button class="btn primary review-accept">${t("review.accept")}</button>
+                  <button class="btn subtle review-skip">${t("review.skip")}</button>
+                </div>
+              </div>
+            </div>`
+          )
+          .join("")
+      );
+      $("reviewList").querySelectorAll(".review-item").forEach((item) => {
+        const trackId = item.dataset.trackId;
+        const select = item.querySelector(".review-candidate");
+        const accept = item.querySelector(".review-accept");
+        const skip = item.querySelector(".review-skip");
+        accept.addEventListener("click", async () => {
+          accept.disabled = true;
+          skip.disabled = true;
+          try {
+            await api("/api/review/accept", {
+              method: "POST",
+              body: JSON.stringify({ trackId, candidateIndex: Number(select.value) }),
+            });
+            await refreshState();
+          } catch (err) {
+            log(err.message);
+            accept.disabled = false;
+            skip.disabled = false;
+          }
+        });
+        skip.addEventListener("click", async () => {
+          accept.disabled = true;
+          skip.disabled = true;
+          try {
+            await api("/api/review/skip", {
+              method: "POST",
+              body: JSON.stringify({ trackId }),
+            });
+            await refreshState();
+          } catch (err) {
+            log(err.message);
+            accept.disabled = false;
+            skip.disabled = false;
+          }
+        });
+      });
+    }
+    reviewOffset += data.rows?.length || 0;
+    $("loadMoreReviews").classList.toggle("hidden", reviewOffset >= reviewTotal);
+  } catch (err) {
+    log(t("log.loadStateFailed", { error: err.message }));
+  } finally {
+    reviewLoading = false;
   }
 }
 
@@ -1046,6 +1160,11 @@ $('trackSearch').addEventListener('input', () => {
   trackSearchTimer = setTimeout(() => loadTrackRows(true), 280);
 });
 $('loadMoreTracks').addEventListener('click', () => loadTrackRows(false));
+$('reviewSearch').addEventListener('input', () => {
+  clearTimeout(reviewSearchTimer);
+  reviewSearchTimer = setTimeout(() => loadReviewItems(true), 280);
+});
+$('loadMoreReviews').addEventListener('click', () => loadReviewItems(false));
 $('openTracksBtn').addEventListener('click', () => {
   const details = $('tracksDetails');
   details.open = true;

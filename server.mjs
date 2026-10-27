@@ -382,6 +382,20 @@ function cacheStatsForTracks(tracks, cache) {
   return stats;
 }
 
+function buildSourceTrackIndex() {
+  const index = new Map();
+  const add = (playlistName, tracks) => {
+    for (const track of tracks || []) {
+      const id = String(track.id);
+      if (!index.has(id)) index.set(id, { track, playlists: new Set() });
+      index.get(id).playlists.add(playlistName);
+    }
+  };
+  add(source?.liked?.name || '我喜欢的音乐', source?.liked?.tracks);
+  for (const playlist of source?.playlists || []) add(playlist.name, playlist.tracks);
+  return index;
+}
+
 function base64Url(input) {
   return Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -1122,6 +1136,87 @@ async function routeApi(req, res, pathname, method) {
     const playlist = (source.playlists || []).find((p) => String(p.id) === id);
     if (!playlist) return sendJson(res, 404, { error: '找不到这个歌单。' });
     return sendJson(res, 200, playlist);
+  }
+  if (pathname === '/api/review' && method === 'GET') {
+    if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });
+    const params = new URL(req.url, `http://${req.headers.host}`).searchParams;
+    const query = String(params.get('q') || '').trim().toLowerCase();
+    const offset = Math.max(0, Number(params.get('offset') || 0));
+    const limit = Math.min(50, Math.max(1, Number(params.get('limit') || 20)));
+    const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+    const cache = loadMatchProgress(sourceKey);
+    const index = buildSourceTrackIndex();
+    const rows = [];
+    for (const [trackId, result] of cache) {
+      if (result.status !== 'review') continue;
+      const entry = index.get(trackId);
+      if (!entry || !result.candidates?.length) continue;
+      const haystack = [
+        entry.track.name,
+        entry.track.album,
+        ...(entry.track.artists || []),
+        ...(result.candidates || []).map((c) => c.name),
+      ]
+        .join(' ')
+        .toLowerCase();
+      if (query && !haystack.includes(query)) continue;
+      rows.push({
+        track_id: trackId,
+        source: entry.track,
+        playlists: [...entry.playlists],
+        candidates: result.candidates.slice(0, 5),
+        current_match: result.match || null,
+      });
+    }
+    return sendJson(res, 200, {
+      total: rows.length,
+      offset,
+      limit,
+      rows: rows.slice(offset, offset + limit),
+    });
+  }
+  if (pathname === '/api/review/accept' && method === 'POST') {
+    if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });
+    const body = await readBody(req);
+    const trackId = String(body.trackId || '');
+    const candidateIndex = Math.max(0, Number(body.candidateIndex || 0));
+    const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+    const cache = loadMatchProgress(sourceKey);
+    const result = cache.get(trackId);
+    if (!result || result.status !== 'review') {
+      return sendJson(res, 404, { error: '这条待确认记录已经处理或不存在。' });
+    }
+    const candidate = result.candidates?.[candidateIndex];
+    if (!candidate?.uri) return sendJson(res, 400, { error: '请选择一个有效的 Spotify 候选。' });
+    const updated = {
+      ...result,
+      status: 'matched',
+      reason: 'Manually accepted',
+      match: candidate,
+      reviewed_at: new Date().toISOString(),
+    };
+    appendMatchProgress(sourceKey, trackId, updated);
+    return sendJson(res, 200, { ok: true, result: updated });
+  }
+  if (pathname === '/api/review/skip' && method === 'POST') {
+    if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });
+    const body = await readBody(req);
+    const trackId = String(body.trackId || '');
+    const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+    const cache = loadMatchProgress(sourceKey);
+    const result = cache.get(trackId);
+    if (!result || result.status !== 'review') {
+      return sendJson(res, 404, { error: '这条待确认记录已经处理或不存在。' });
+    }
+    const updated = {
+      status: 'unmatched',
+      reason: 'Manually skipped',
+      match: null,
+      candidates: [],
+      reviewed_at: new Date().toISOString(),
+    };
+    appendMatchProgress(sourceKey, trackId, updated);
+    return sendJson(res, 200, { ok: true, result: updated });
   }
   if (pathname === '/api/netease/qr' && method === 'POST') {
     const key = await neteaseQrKey();
