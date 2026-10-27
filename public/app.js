@@ -49,6 +49,12 @@ const I18N = {
   "exported.collapse": { zh: "收起", en: "Collapse" },
   "exported.loading": { zh: "加载中...", en: "Loading..." },
   "exported.count": { zh: "共 {count} 个歌单", en: "{count} playlists" },
+  "exported.cacheSummary": {
+    zh: "已缓存 {total} 首：成功 {matched}，待确认 {review}，未找到 {unmatched}",
+    en: "{total} tracks cached: {matched} matched, {review} review, {unmatched} unmatched",
+  },
+  "exported.matchPill": { zh: "匹配 {cached}/{available}", en: "Matched {cached}/{available}" },
+  "exported.matchNone": { zh: "未开始匹配", en: "Not matched" },
   "batch.none": { zh: "未选择歌单", en: "No playlists selected" },
   "batch.selected": {
     zh: "已选 {playlists} 个歌单，共 {tracks} 首（上限 700）",
@@ -79,6 +85,18 @@ const I18N = {
   "match.delay": { zh: "每次搜索间隔（毫秒，至少 3000）", en: "Delay between searches (ms, 3000 minimum)" },
   "match.start": { zh: "匹配所选歌单", en: "Match selected playlists" },
   "common.cancel": { zh: "取消", en: "Cancel" },
+  "common.loadMore": { zh: "加载更多", en: "Load more" },
+  "tracks.title": { zh: "已导出的歌曲", en: "Exported tracks" },
+  "tracks.hint": {
+    zh: "搜索全部已导出曲目，并查看每首歌当前的匹配状态。",
+    en: "Search all exported tracks and inspect each track's current match status.",
+  },
+  "tracks.search": { zh: "搜索歌曲、歌手或歌单", en: "Search tracks, artists, or playlists" },
+  "tracks.count": { zh: "共 {total} 条", en: "{total} tracks" },
+  "track.status.matched": { zh: "已匹配", en: "Matched" },
+  "track.status.review": { zh: "待确认", en: "Review" },
+  "track.status.unmatched": { zh: "未找到", en: "Unmatched" },
+  "track.status.not_matched": { zh: "未匹配", en: "Not matched" },
   "apply.title": { zh: "写入 Spotify", en: "Write to Spotify" },
   "apply.hint": {
     zh: "喜欢歌曲进入 Liked Songs；其余歌单按原名分别建立私有歌单。",
@@ -480,7 +498,10 @@ async function refreshState() {
   if (state.plan) activeStep = Math.max(activeStep, 3);
   if (state.applied) activeStep = Math.max(activeStep, 4);
   setStep(activeStep);
-  if (state.source) await loadExportedPlaylists();
+  if (state.source) {
+    await loadExportedPlaylists();
+    await loadTrackRows(true);
+  }
 }
 
 function escapeHtml(value) {
@@ -501,6 +522,9 @@ const exportedTrackCache = new Map();
 async function loadExportedPlaylists() {
   try {
     exportedData = await api("/api/source/playlists");
+    if (exportedData.match_cache) {
+      $("cacheSummary").textContent = t("exported.cacheSummary", exportedData.match_cache);
+    }
     renderExportedList();
     renderFailedExports();
   } catch (err) {
@@ -516,12 +540,14 @@ function exportedRows() {
       name: t("exported.liked"),
       available: exportedData.liked.available,
       unavailable: exportedData.liked.unavailable,
+      match: exportedData.liked.match || {},
     },
     ...exportedData.playlists.map((p) => ({
       key: `playlist:${p.id}`,
       name: p.name,
       available: p.available,
       unavailable: p.unavailable,
+      match: p.match || {},
     })),
   ];
 }
@@ -536,8 +562,12 @@ function renderExportedList() {
     return;
   }
   $("exportedList").innerHTML = rows
-    .map(
-      (row) => `
+    .map((row) => {
+      const match = row.match || {};
+      const matchText = match.cached
+        ? t("exported.matchPill", { cached: match.cached, available: row.available })
+        : t("exported.matchNone");
+      return `
       <div class="playlist-item" data-key="${escapeHtml(row.key)}">
         <div class="playlist-row-wrap">
           <input class="playlist-check" type="checkbox" data-key="${escapeHtml(row.key)}" ${selectedPlaylists.has(row.key) ? "checked" : ""}>
@@ -545,14 +575,15 @@ function renderExportedList() {
             <span class="playlist-chevron">›</span>
             <span class="playlist-name">${escapeHtml(row.name)}</span>
             <span class="playlist-pills">
+              <span class="pill ${match.cached ? "match-progress" : ""}">${matchText}</span>
               <span class="pill available">${row.available} ${t("exported.available")}</span>
               ${row.unavailable ? `<span class="pill missing">${row.unavailable} ${t("exported.missing")}</span>` : ""}
             </span>
           </button>
         </div>
         <div class="playlist-detail hidden"></div>
-      </div>`
-    )
+      </div>`;
+    })
     .join("");
 
   $("exportedList").querySelectorAll(".playlist-item").forEach((item) => {
@@ -677,6 +708,57 @@ function renderFailedExports() {
       <p>${t("exported.failedHint")}</p>
       <div>${failed.map((p) => `<span class="failed-name">${escapeHtml(p.name)} · ${escapeHtml(p.id)}</span>`).join("")}</div>
     </div>`;
+}
+
+let trackOffset = 0;
+let trackTotal = 0;
+let trackLoading = false;
+let trackSearchTimer = null;
+
+function trackStatusLabel(status) {
+  return t(`track.status.${status || "not_matched"}`);
+}
+
+async function loadTrackRows(reset = false) {
+  if (trackLoading) return;
+  trackLoading = true;
+  try {
+    const query = ($("trackSearch")?.value || "").trim();
+    if (reset) {
+      trackOffset = 0;
+      $("trackResults").innerHTML = "";
+    }
+    const params = new URLSearchParams({
+      q: query,
+      offset: String(trackOffset),
+      limit: "100",
+    });
+    const data = await api(`/api/source/tracks?${params.toString()}`);
+    trackTotal = data.total;
+    $("trackCount").textContent = t("tracks.count", { total: data.total });
+    const html = (data.rows || [])
+      .map(
+        (row) => `
+        <div class="flat-track-row">
+          <div class="flat-track-main">
+            <b>${escapeHtml(row.name)}</b>
+            <small>${escapeHtml((row.artists || []).join(" / "))}</small>
+            <em>${escapeHtml(row.playlist_name)}</em>
+          </div>
+          <span class="track-status status-${escapeHtml(row.match_status)}">${trackStatusLabel(row.match_status)}</span>
+        </div>`
+      )
+      .join("");
+    $("trackResults").insertAdjacentHTML("beforeend", html);
+    trackOffset += data.rows?.length || 0;
+    const more = $("loadMoreTracks");
+    more.classList.toggle("hidden", trackOffset >= trackTotal);
+    more.textContent = t("common.loadMore");
+  } catch (err) {
+    log(t("log.loadStateFailed", { error: err.message }));
+  } finally {
+    trackLoading = false;
+  }
 }
 
 async function startNeteaseQr() {
@@ -856,6 +938,11 @@ document.querySelectorAll('.pick-toggle button').forEach((btn) => {
 });
 
 $('playlistSearch').addEventListener('input', renderExportedList);
+$('trackSearch').addEventListener('input', () => {
+  clearTimeout(trackSearchTimer);
+  trackSearchTimer = setTimeout(() => loadTrackRows(true), 280);
+});
+$('loadMoreTracks').addEventListener('click', () => loadTrackRows(false));
 $('selectAllBtn').addEventListener('click', () => {
   for (const row of exportedRows()) selectedPlaylists.add(row.key);
   renderExportedList();

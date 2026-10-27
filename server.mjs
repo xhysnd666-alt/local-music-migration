@@ -368,6 +368,20 @@ function appendMatchProgress(sourceKey, id, result) {
   fs.appendFileSync(matchProgressPath, line, 'utf8');
 }
 
+function cacheStatsForTracks(tracks, cache) {
+  const ids = new Set((tracks || []).map((track) => String(track.id)));
+  const stats = { cached: 0, matched: 0, review: 0, unmatched: 0 };
+  for (const id of ids) {
+    const result = cache.get(id);
+    if (!result) continue;
+    stats.cached += 1;
+    if (result.status === 'matched') stats.matched += 1;
+    else if (result.status === 'review') stats.review += 1;
+    else stats.unmatched += 1;
+  }
+  return stats;
+}
+
 function base64Url(input) {
   return Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -1012,12 +1026,21 @@ async function routeApi(req, res, pathname, method) {
   }
   if (pathname === '/api/source/playlists' && method === 'GET') {
     if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });
+    const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+    const cache = loadMatchProgress(sourceKey);
+    const cacheCounts = { matched: 0, review: 0, unmatched: 0 };
+    for (const result of cache.values()) {
+      if (result.status === 'matched') cacheCounts.matched += 1;
+      else if (result.status === 'review') cacheCounts.review += 1;
+      else cacheCounts.unmatched += 1;
+    }
     return sendJson(res, 200, {
       liked: {
         name: source.liked?.name || '我喜欢的音乐',
         available: source.liked?.tracks?.length || 0,
         unavailable: source.liked?.unavailable_track_ids?.length || 0,
         original: source.liked?.track_count || 0,
+        match: cacheStatsForTracks(source.liked?.tracks, cache),
       },
       playlists: (source.playlists || []).map((p) => ({
         id: String(p.id),
@@ -1026,13 +1049,72 @@ async function routeApi(req, res, pathname, method) {
         available: p.tracks?.length || 0,
         unavailable: p.unavailable_track_ids?.length || 0,
         original: p.track_count || 0,
+        match: cacheStatsForTracks(p.tracks, cache),
       })),
       failed: source.failed_playlists || [],
+      match_cache: {
+        total: cache.size,
+        ...cacheCounts,
+      },
     });
   }
   if (pathname === '/api/source/liked' && method === 'GET') {
     if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });
     return sendJson(res, 200, source.liked || {});
+  }
+  if (pathname === '/api/source/tracks' && method === 'GET') {
+    if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });
+    const params = new URL(req.url, `http://${req.headers.host}`).searchParams;
+    const query = String(params.get('q') || '').trim().toLowerCase();
+    const offset = Math.max(0, Number(params.get('offset') || 0));
+    const limit = Math.min(200, Math.max(1, Number(params.get('limit') || 100)));
+    const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+    const cache = loadMatchProgress(sourceKey);
+    const rows = [];
+    const addTracks = (playlistName, playlistId, tracks) => {
+      for (const track of tracks || []) {
+        const id = String(track.id);
+        const result = cache.get(id);
+        const match = result?.match || {};
+        rows.push({
+          playlist_name: playlistName,
+          playlist_id: String(playlistId),
+          track_id: id,
+          name: track.name || '',
+          artists: track.artists || [],
+          album: track.album || '',
+          duration_ms: track.duration_ms || 0,
+          match_status: result?.status || 'not_matched',
+          spotify_uri: match.uri || '',
+          spotify_name: match.name || '',
+          spotify_artists: match.artists || [],
+        });
+      }
+    };
+    addTracks(source.liked?.name || '我喜欢的音乐', 'liked', source.liked?.tracks);
+    for (const playlist of source.playlists || []) {
+      addTracks(playlist.name, playlist.id, playlist.tracks);
+    }
+    const filtered = query
+      ? rows.filter((row) => {
+          const haystack = [
+            row.playlist_name,
+            row.name,
+            row.album,
+            ...(row.artists || []),
+            ...(row.spotify_artists || []),
+          ]
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(query);
+        })
+      : rows;
+    return sendJson(res, 200, {
+      total: filtered.length,
+      offset,
+      limit,
+      rows: filtered.slice(offset, offset + limit),
+    });
   }
   if (pathname.startsWith('/api/source/playlist/') && method === 'GET') {
     if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });

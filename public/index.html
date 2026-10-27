@@ -135,6 +135,7 @@
           <span class="hint" id="exportedCount"></span>
         </div>
         <p class="hint" data-i18n="exported.hint">这些是本次已读取到的歌单；点开任意一项可以核对具体曲目。</p>
+        <div id="cacheSummary" class="cache-summary"></div>
         <div class="batch-toolbar">
           <span id="batchInfo" data-i18n="batch.none">未选择歌单</span>
           <div>
@@ -145,6 +146,17 @@
         <input id="playlistSearch" class="playlist-search" type="text" data-i18n-placeholder="exported.search" placeholder="搜索歌单">
         <div id="exportedList" class="playlist-list"></div>
         <div id="failedExports" class="failed-exports"></div>
+      </section>
+
+      <section class="card" id="card-tracks">
+        <div class="card-head">
+          <h2 data-i18n="tracks.title">已导出的歌曲</h2>
+          <span id="trackCount" class="hint"></span>
+        </div>
+        <p class="hint" data-i18n="tracks.hint">搜索全部已导出曲目，并查看每首歌当前的匹配状态。</p>
+        <input id="trackSearch" class="playlist-search" type="text" data-i18n-placeholder="tracks.search" placeholder="搜索歌曲、歌手或歌单">
+        <div id="trackResults" class="flat-track-list"></div>
+        <button id="loadMoreTracks" class="btn subtle hidden" data-i18n="common.loadMore">加载更多</button>
       </section>
 
       <section class="card" id="card-spotify">
