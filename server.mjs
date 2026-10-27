@@ -830,7 +830,7 @@ async function addPlaylistItems(playlistId, uris) {
   }
 }
 
-async function runApply(job) {
+async function runApply(job, allowPartial = false) {
   if (!plan) throw new Error('请先完成匹配预览。');
   const me = await spotifyRequest('GET', '/me');
   if (plan.spotify_user?.id && plan.spotify_user.id !== me.id) {
@@ -844,7 +844,16 @@ async function runApply(job) {
     playlists_created: 0,
     playlist_items_added: 0,
     playlist_items_already_present: 0,
+    skipped_unmatched: 0,
   };
+  const incomplete = plan.targets
+    .flatMap((target) => target.tracks)
+    .filter((track) => track.status !== 'matched' || !track.destination_uri);
+  if (!allowPartial && incomplete.length) {
+    throw new Error(
+      `本批还有 ${incomplete.length} 首未匹配或需要人工确认。请重新匹配，或勾选“允许部分写入”。`,
+    );
+  }
   let total = plan.targets.reduce((sum, t) => sum + t.tracks.length, 0);
   let done = 0;
   job.progress = { done: 0, total, message: '开始写入 Spotify' };
@@ -858,6 +867,8 @@ async function runApply(job) {
         if (track.status === 'matched') {
           if (track.already_present) summary.liked_already_present += 1;
           else pending.push(track);
+        } else {
+          summary.skipped_unmatched += 1;
         }
         done += 1;
       }
@@ -867,6 +878,19 @@ async function runApply(job) {
       for (const t of pending) t.apply_status = 'saved_to_liked';
       job.progress = { done, total, message: `已保存喜欢歌曲 ${summary.liked_saved} 首` };
     } else {
+      const matchedInTarget = target.tracks.filter(
+        (track) => track.status === 'matched' && track.destination_uri,
+      );
+      if (!matchedInTarget.length) {
+        summary.skipped_unmatched += target.tracks.length;
+        done += target.tracks.length;
+        job.progress = {
+          done,
+          total,
+          message: `歌单“${target.name}”没有已匹配曲目，已跳过`,
+        };
+        continue;
+      }
       const marker = markerFor(target.source_id);
       let playlist = existingPlaylists.find((p) => p.id === target.destination_playlist_id);
       if (!playlist) playlist = existingPlaylists.find((p) => String(p.description || '').includes(marker));
@@ -889,6 +913,8 @@ async function runApply(job) {
         if (track.status === 'matched') {
           if (track.already_present) summary.playlist_items_already_present += 1;
           else pending.push(track);
+        } else {
+          summary.skipped_unmatched += 1;
         }
         done += 1;
       }
@@ -1056,7 +1082,8 @@ async function routeApi(req, res, pathname, method) {
     return sendJson(res, 202, { jobId: id });
   }
   if (pathname === '/api/apply' && method === 'POST') {
-    const id = startJob('apply', (job) => runApply(job));
+    const body = await readBody(req);
+    const id = startJob('apply', (job) => runApply(job, Boolean(body.allowPartial)));
     return sendJson(res, 202, { jobId: id });
   }
   if (pathname === '/api/verify' && method === 'POST') {

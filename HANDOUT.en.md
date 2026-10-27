@@ -33,6 +33,8 @@ Spotify Web API apps require a Premium account. No Client Secret is needed.
 
 Select the playlists for this batch under “Exported playlists”, then start matching. Each batch is limited to 700 tracks. After writing and verifying that batch, return and select the next one. For the first run, test with a playlist of 100–300 tracks.
 
+If some tracks cannot be matched yet, enable “Allow partial write”. Only matched tracks are written; selecting the same playlist later reuses the existing Spotify playlist and appends the missing tracks.
+
 ## Troubleshooting
 
 **Spotify 429**

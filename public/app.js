@@ -77,7 +77,7 @@ const I18N = {
     en: "Only selected playlists from “Exported playlists” are matched; each batch is limited to 700 tracks.",
   },
   "match.delay": { zh: "每次搜索间隔（毫秒，至少 3000）", en: "Delay between searches (ms, 3000 minimum)" },
-  "match.start": { zh: "开始匹配预览", en: "Start match preview" },
+  "match.start": { zh: "匹配所选歌单", en: "Match selected playlists" },
   "common.cancel": { zh: "取消", en: "Cancel" },
   "apply.title": { zh: "写入 Spotify", en: "Write to Spotify" },
   "apply.hint": {
@@ -85,9 +85,17 @@ const I18N = {
     en: "Liked songs go to Liked Songs; other playlists are created as private with their original names.",
   },
   "apply.start": { zh: "确认并写入", en: "Confirm & write" },
+  "apply.allowPartial": {
+    zh: "允许部分写入：先写入已匹配曲目，未匹配的以后补齐",
+    en: "Allow partial write: write matched tracks now and fill missing tracks later",
+  },
   "apply.confirm": {
     zh: "确认把喜欢歌曲写入 Liked Songs，并按原名创建歌单？此操作会修改你的 Spotify 库。",
     en: "Confirm writing liked songs to Liked Songs and recreating playlists under their original names? This modifies your Spotify library.",
+  },
+  "apply.partialConfirm": {
+    zh: "本批存在未匹配曲目。确认只写入已匹配曲目？未匹配曲目以后可以重新选择同一歌单补齐。",
+    en: "This batch contains unmatched tracks. Write only the matched tracks now? You can re-select the same playlists later to fill the gaps.",
   },
   "verify.title": { zh: "核对结果", en: "Verify results" },
   "verify.start": { zh: "开始核对", en: "Start verification" },
@@ -771,11 +779,15 @@ async function startMatch() {
 }
 
 async function startApply() {
-  const applyConfirm = t("apply.confirm");
+  const allowPartial = $('allowPartial').checked;
+  const applyConfirm = t(allowPartial ? "apply.partialConfirm" : "apply.confirm");
   if (!confirm(applyConfirm)) return;
   try {
     $('applyBtn').disabled = true;
-    const { jobId } = await api('/api/apply', { method: 'POST' });
+    const { jobId } = await api('/api/apply', {
+      method: 'POST',
+      body: JSON.stringify({ allowPartial }),
+    });
     log(t("log.applyStart"));
     await pollJob(jobId, $('applyProgress'), (result) => {
       log(t("log.applyDone"));

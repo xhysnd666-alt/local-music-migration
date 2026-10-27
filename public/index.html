@@ -184,6 +184,10 @@
       <section class="card" id="card-apply">
         <div class="card-head"><h2 data-i18n="apply.title">写入 Spotify</h2></div>
         <p class="hint" data-i18n="apply.hint">喜欢歌曲进入 Liked Songs；其余歌单按原名分别建立私有歌单。</p>
+        <label class="check-row">
+          <input id="allowPartial" type="checkbox">
+          <span data-i18n="apply.allowPartial">允许部分写入：先写入已匹配曲目，未匹配的以后补齐</span>
+        </label>
         <button id="applyBtn" class="btn danger" data-i18n="apply.start">确认并写入</button>
         <div id="applyProgress" class="progress hidden"></div>
         <div id="applySummary" class="summary"></div>

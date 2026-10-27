@@ -60,6 +60,8 @@ You do not need to match all 16k songs at once. Select playlists under “Export
 
 For the first test, choose a playlist with 100–300 tracks, run the complete match/write/verify cycle, and then continue with the remaining batches. Playlists already created in Spotify are reused through migration markers.
 
+If some tracks cannot be matched yet, enable “Allow partial write”: matched tracks are written first and unmatched tracks are skipped. Re-select the same playlist later to reuse the existing Spotify playlist and append the missing tracks.
+
 ## Data and security
 
 - `data/` stores local authorization state and exported data and is excluded by `.gitignore`.
