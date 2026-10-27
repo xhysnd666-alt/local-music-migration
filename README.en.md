@@ -50,7 +50,7 @@ Spotify currently requires a Premium account for Web API apps. Enter the Client 
 2. Click “Export my playlists” and wait for the export to finish.
 3. Use “Exported playlists” to verify counts and inspect individual tracks. Playlists NetEase reports as under review are listed separately.
 4. Enter the Spotify Client ID and click “Authorize Spotify”.
-5. Open “Match preview”, set the search delay to 1000 ms, and review the matched, review, and unmatched counts.
+5. Open “Match preview”, set the search delay to 2000 ms, and review the matched, review, and unmatched counts.
 6. After approval, click “Confirm & write”. Liked songs go to Liked Songs; other playlists are recreated with their original names.
 7. Click “Start verification” and check the final destination state.
 
@@ -83,6 +83,7 @@ local-migrate-site/
 
 - Spotify Web API access requires a Premium account.
 - Search endpoints use rolling rate limits. When a 429 is returned, wait for `Retry-After` or increase the search delay.
+- Match results are cached track by track in `data/match-progress.jsonl`; a restarted run skips songs that are already cached.
 - The NetEase community API is not an official long-term stable API and may change.
 - Live versions, remixes, instrumentals, regional removals, and same-name tracks may require manual review.
 - This tool migrates song references; it does not download or upload audio.

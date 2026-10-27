@@ -27,6 +27,7 @@ const statePath = path.join(DATA_DIR, 'state.json');
 const sourcePath = path.join(DATA_DIR, 'source.json');
 const planPath = path.join(DATA_DIR, 'plan.json');
 const appliedPath = path.join(DATA_DIR, 'applied.json');
+const matchProgressPath = path.join(DATA_DIR, 'match-progress.jsonl');
 
 let neteaseCookie = '';
 let neteaseAccount = null;
@@ -342,6 +343,29 @@ function sourceSummary() {
     unique_tracks: unique.size,
     failed_playlists: source.failed_playlists?.length || 0,
   };
+}
+
+function loadMatchProgress(sourceKey) {
+  const map = new Map();
+  if (!fs.existsSync(matchProgressPath)) return map;
+  const lines = fs.readFileSync(matchProgressPath, 'utf8').split(/\r?\n/);
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    try {
+      const entry = JSON.parse(line);
+      if (entry.source_key === sourceKey && entry.id && entry.result) {
+        map.set(String(entry.id), entry.result);
+      }
+    } catch {
+      // Ignore a partial trailing line after an interrupted write.
+    }
+  }
+  return map;
+}
+
+function appendMatchProgress(sourceKey, id, result) {
+  const line = JSON.stringify({ source_key: sourceKey, id: String(id), result }) + '\n';
+  fs.appendFileSync(matchProgressPath, line, 'utf8');
 }
 
 function base64Url(input) {
@@ -704,13 +728,25 @@ async function runMatch(job, delay) {
   }
   const ordered = [...unique.values()];
   const total = ordered.length;
-  job.progress = { done: 0, total, message: '开始匹配' };
+  const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+  const cache = loadMatchProgress(sourceKey);
+  job.progress = { done: 0, total, message: `开始匹配（已有缓存 ${cache.size} 首）` };
   const matches = new Map();
   for (let i = 0; i < total; i += 1) {
     if (job?.cancelled) throw new Error('已取消');
     const track = ordered[i];
-    matches.set(String(track.id), await matchTrack(track, market));
-    job.progress = { done: i + 1, total, message: `匹配 ${i + 1}/${total}` };
+    const id = String(track.id);
+    let result = cache.get(id);
+    if (!result) {
+      result = await matchTrack(track, market);
+      appendMatchProgress(sourceKey, id, result);
+    }
+    matches.set(id, result);
+    job.progress = {
+      done: i + 1,
+      total,
+      message: `匹配 ${i + 1}/${total}${cache.has(id) ? '（缓存）' : ''}`,
+    };
     if (delay > 0 && i < total - 1) await sleep(delay);
   }
   const planTargets = [];

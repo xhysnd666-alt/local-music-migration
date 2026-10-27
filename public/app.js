@@ -61,7 +61,7 @@ const I18N = {
   "spotify.redirect": { zh: "回调地址：", en: "Redirect URI: " },
   "match.title": { zh: "匹配预览", en: "Match preview" },
   "match.hint": { zh: "只读取，不会写入你的 Spotify", en: "Read-only, nothing is written" },
-  "match.delay": { zh: "每次搜索间隔（毫秒，建议 1000）", en: "Delay between searches (ms, 1000 recommended)" },
+  "match.delay": { zh: "每次搜索间隔（毫秒，建议 2000）", en: "Delay between searches (ms, 2000 recommended)" },
   "match.start": { zh: "开始匹配预览", en: "Start match preview" },
   "common.cancel": { zh: "取消", en: "Cancel" },
   "apply.title": { zh: "写入 Spotify", en: "Write to Spotify" },
@@ -679,7 +679,7 @@ async function logoutSpotify() {
 }
 
 async function startMatch() {
-  const delay = Number($('delay').value || 500);
+  const delay = Number($('delay').value || 2000);
   try {
     $('matchBtn').disabled = true;
     show($('cancelBtn'));

@@ -23,7 +23,7 @@ Spotify Web API apps require a Premium account. No Client Secret is needed.
 
 ## Run the migration
 
-1. Open “Match preview” and set the search delay to 1000 ms.
+1. Open “Match preview” and set the search delay to 2000 ms.
 2. Click “Start match preview” and wait for the counts.
 3. Review matched, review, and unmatched tracks.
 4. After approval, click “Confirm & write”.
@@ -34,6 +34,8 @@ Spotify Web API apps require a Premium account. No Client Secret is needed.
 **Spotify 429**
 
 The search endpoint is rate-limited. Do not retry continuously; wait for the suggested delay or increase the search interval.
+
+Match results are cached one track at a time in `data/match-progress.jsonl`. After an interruption, clicking “Start match preview” again resumes only the tracks that have not been matched.
 
 **QR code expired**
 
