@@ -40,9 +40,14 @@
     </aside>
 
     <main>
+      <section class="guide-banner">
+        <span class="guide-kicker" data-i18n="guide.kicker">当前建议</span>
+        <p id="nextStepText" data-i18n="guide.connect">先确认网易云和 Spotify 都已连接。</p>
+      </section>
+
       <section class="card flow-card">
         <div class="card-head">
-          <h2 data-i18n="flow.title">这次要迁移什么</h2>
+          <h2 data-i18n="flow.title">迁移方向</h2>
           <button class="btn subtle" id="swapBtn" data-i18n="flow.swap">⇄ 交换</button>
         </div>
         <div class="flow-select">
@@ -64,7 +69,6 @@
             </div>
             <div class="name" id="sourceName"></div>
           </div>
-
           <div class="beam">
             <svg viewBox="0 0 300 160" preserveAspectRatio="none">
               <defs>
@@ -82,7 +86,6 @@
             <span class="particle p3"></span>
             <span class="particle p4"></span>
           </div>
-
           <div class="node receive" id="destNode">
             <div class="logo" id="destLogo">
               <span class="ripple"></span>
@@ -95,32 +98,49 @@
         <p class="hint" id="flowHint"></p>
       </section>
 
-      <section class="card" id="card-services">
-        <div class="card-head">
-          <h2 data-i18n="services.title">支持的音乐服务</h2>
-          <div class="pick-toggle">
-            <button class="active" data-mode="source" data-i18n="services.pickSource">设为来源</button>
-            <button data-mode="dest" data-i18n="services.pickTarget">设为目标</button>
+      <section class="card">
+        <div class="card-head section-head">
+          <div>
+            <span class="section-step">1</span>
+            <h2 data-i18n="accounts.title">账号与数据</h2>
+          </div>
+          <span class="hint" data-i18n="accounts.subtitle">先连接账号，再导出歌单。</span>
+        </div>
+
+        <div class="account-grid">
+          <div class="account-panel">
+            <div class="account-panel-head">
+              <h3 data-i18n="netease.title">网易云音乐</h3>
+              <span class="status" id="neteaseStatus" data-i18n="status.notLoggedIn">未登录</span>
+            </div>
+            <div class="row">
+              <button id="neteaseQrBtn" class="btn" data-i18n="netease.qr">生成登录二维码</button>
+              <button id="exportBtn" class="btn primary hidden" data-i18n="netease.export">导出我的歌单</button>
+            </div>
+            <div id="qrWrap" class="qr hidden">
+              <img id="qrImg" alt="网易云登录二维码">
+              <p class="hint" data-i18n="netease.qrHint">用网易云音乐 App 扫码并确认</p>
+            </div>
+            <div id="exportProgress" class="progress hidden"></div>
+          </div>
+
+          <div class="account-panel">
+            <div class="account-panel-head">
+              <h3 data-i18n="spotify.title">Spotify</h3>
+              <span class="status" id="spotifyStatus" data-i18n="status.notLoggedIn">未登录</span>
+            </div>
+            <label class="field">
+              <span data-i18n="spotify.clientId">Spotify Client ID</span>
+              <input id="clientId" type="text" placeholder="713ba9d9..." data-i18n-placeholder="spotify.clientIdPlaceholder">
+            </label>
+            <div class="row">
+              <button id="spotifyLoginBtn" class="btn primary" data-i18n="spotify.login">打开 Spotify 授权</button>
+              <button id="spotifyLogoutBtn" class="btn subtle" data-i18n="spotify.logout">退出授权</button>
+            </div>
+            <p class="hint"><span data-i18n="spotify.redirect">回调地址：</span><code>http://127.0.0.1:8787/callback</code></p>
           </div>
         </div>
-        <p class="hint" data-i18n="services.hint">点击一个“可用”的服务，把它设为你当前选择的来源或目标；其余为即将支持。</p>
-        <div class="service-grid" id="serviceGrid"></div>
-      </section>
 
-      <section class="card" id="card-netease">
-        <div class="card-head">
-          <h2 data-i18n="netease.title">网易云登录与导出</h2>
-          <span class="status" id="neteaseStatus" data-i18n="status.notLoggedIn">未登录</span>
-        </div>
-        <div class="row">
-          <button id="neteaseQrBtn" class="btn" data-i18n="netease.qr">生成登录二维码</button>
-          <button id="exportBtn" class="btn primary hidden" data-i18n="netease.export">导出我的歌单</button>
-        </div>
-        <div id="qrWrap" class="qr hidden">
-          <img id="qrImg" alt="网易云登录二维码">
-          <p class="hint" data-i18n="netease.qrHint">用网易云音乐 App 扫码并确认</p>
-        </div>
-        <div id="exportProgress" class="progress hidden"></div>
         <div id="sourceSummary" class="stats">
           <div class="stat"><b id="statLiked">0</b><span data-i18n="stats.liked">喜欢歌曲</span></div>
           <div class="stat"><b id="statPlaylists">0</b><span data-i18n="stats.playlists">歌单</span></div>
@@ -130,12 +150,16 @@
       </section>
 
       <section class="card" id="card-exported">
-        <div class="card-head">
-          <h2 data-i18n="exported.title">已导出的歌单</h2>
+        <div class="card-head section-head">
+          <div>
+            <span class="section-step">2</span>
+            <h2 data-i18n="playlists.title">选择歌单并匹配</h2>
+          </div>
           <span class="hint" id="exportedCount"></span>
         </div>
-        <p class="hint" data-i18n="exported.hint">这些是本次已读取到的歌单；点开任意一项可以核对具体曲目。</p>
+        <p class="hint" data-i18n="playlists.hint">勾选这一批要迁移的歌单。点歌单名称是查看详情，勾选左侧“选择”才会加入批次。</p>
         <div id="cacheSummary" class="cache-summary"></div>
+
         <div class="batch-toolbar">
           <span id="batchInfo" data-i18n="batch.none">未选择歌单</span>
           <div>
@@ -146,9 +170,58 @@
         <input id="playlistSearch" class="playlist-search" type="text" data-i18n-placeholder="exported.search" placeholder="搜索歌单">
         <div id="exportedList" class="playlist-list"></div>
         <div id="failedExports" class="failed-exports"></div>
+
+        <div class="match-action-bar">
+          <div class="match-action-info">
+            <strong id="batchInfoBottom" data-i18n="batch.none">未选择歌单</strong>
+            <label class="inline-field">
+              <span data-i18n="match.delay">搜索间隔（毫秒，至少 3000）</span>
+              <input id="delay" type="number" value="3000" min="3000" step="250">
+            </label>
+          </div>
+          <div class="row">
+            <button id="cancelBtn" class="btn subtle hidden" data-i18n="common.cancel">取消</button>
+            <button id="matchBtn" class="btn primary" data-i18n="match.start">匹配所选歌单</button>
+          </div>
+        </div>
+        <div id="matchProgress" class="progress hidden"></div>
       </section>
 
-      <section class="card" id="card-tracks">
+      <section class="card" id="card-write">
+        <div class="card-head section-head">
+          <div>
+            <span class="section-step">3</span>
+            <h2 data-i18n="write.title">写入与核对</h2>
+          </div>
+          <span class="hint" data-i18n="write.hint">匹配完成后，再确认写入 Spotify。</span>
+        </div>
+        <div id="planSummary" class="summary"></div>
+        <label class="check-row">
+          <input id="allowPartial" type="checkbox">
+          <span data-i18n="apply.allowPartial">允许部分写入：先写入已匹配曲目，未匹配的以后补齐</span>
+        </label>
+        <div class="row">
+          <button id="applyBtn" class="btn danger" data-i18n="apply.start">确认并写入</button>
+          <button id="verifyBtn" class="btn" data-i18n="verify.start">开始核对</button>
+        </div>
+        <div id="applyProgress" class="progress hidden"></div>
+        <div id="applySummary" class="summary"></div>
+        <div id="verifyProgress" class="progress hidden"></div>
+        <div id="verifySummary" class="summary"></div>
+      </section>
+
+      <details class="card advanced">
+        <summary data-i18n="advanced.services">高级信息：支持的服务</summary>
+        <div class="pick-toggle">
+          <button class="active" data-mode="source" data-i18n="services.pickSource">设为来源</button>
+          <button data-mode="dest" data-i18n="services.pickTarget">设为目标</button>
+        </div>
+        <p class="hint" data-i18n="services.hint">点击一个“可用”的服务，把它设为你当前选择的来源或目标；其余为即将支持。</p>
+        <div class="service-grid" id="serviceGrid"></div>
+      </details>
+
+      <details class="card advanced">
+        <summary data-i18n="advanced.tracks">高级信息：全部导出歌曲</summary>
         <div class="card-head">
           <h2 data-i18n="tracks.title">已导出的歌曲</h2>
           <span id="trackCount" class="hint"></span>
@@ -157,65 +230,12 @@
         <input id="trackSearch" class="playlist-search" type="text" data-i18n-placeholder="tracks.search" placeholder="搜索歌曲、歌手或歌单">
         <div id="trackResults" class="flat-track-list"></div>
         <button id="loadMoreTracks" class="btn subtle hidden" data-i18n="common.loadMore">加载更多</button>
-      </section>
+      </details>
 
-      <section class="card" id="card-spotify">
-        <div class="card-head">
-          <h2 data-i18n="spotify.title">Spotify 授权</h2>
-          <span class="status" id="spotifyStatus" data-i18n="status.notLoggedIn">未登录</span>
-        </div>
-        <label class="field">
-          <span data-i18n="spotify.clientId">Spotify Client ID</span>
-          <input id="clientId" type="text" placeholder="713ba9d9..." data-i18n-placeholder="spotify.clientIdPlaceholder">
-        </label>
-        <div class="row">
-          <button id="spotifyLoginBtn" class="btn primary" data-i18n="spotify.login">打开 Spotify 授权</button>
-          <button id="spotifyLogoutBtn" class="btn subtle" data-i18n="spotify.logout">退出授权</button>
-        </div>
-        <p class="hint"><span data-i18n="spotify.redirect">回调地址：</span><code>http://127.0.0.1:8787/callback</code></p>
-      </section>
-
-      <section class="card" id="card-match">
-        <div class="card-head">
-          <h2 data-i18n="match.title">匹配预览</h2>
-          <span class="hint" data-i18n="match.hint">只读取，不会写入你的 Spotify</span>
-        </div>
-        <p class="hint" data-i18n="match.selectionHint">只匹配“已导出的歌单”中勾选的歌单；每批最多 700 首。</p>
-        <label class="field">
-          <span data-i18n="match.delay">每次搜索间隔（毫秒，至少 3000）</span>
-          <input id="delay" type="number" value="3000" min="3000" step="250">
-        </label>
-        <div class="row">
-          <button id="matchBtn" class="btn primary" data-i18n="match.start">开始匹配预览</button>
-          <button id="cancelBtn" class="btn subtle hidden" data-i18n="common.cancel">取消</button>
-        </div>
-        <div id="matchProgress" class="progress hidden"></div>
-        <div id="planSummary" class="summary"></div>
-      </section>
-
-      <section class="card" id="card-apply">
-        <div class="card-head"><h2 data-i18n="apply.title">写入 Spotify</h2></div>
-        <p class="hint" data-i18n="apply.hint">喜欢歌曲进入 Liked Songs；其余歌单按原名分别建立私有歌单。</p>
-        <label class="check-row">
-          <input id="allowPartial" type="checkbox">
-          <span data-i18n="apply.allowPartial">允许部分写入：先写入已匹配曲目，未匹配的以后补齐</span>
-        </label>
-        <button id="applyBtn" class="btn danger" data-i18n="apply.start">确认并写入</button>
-        <div id="applyProgress" class="progress hidden"></div>
-        <div id="applySummary" class="summary"></div>
-      </section>
-
-      <section class="card" id="card-verify">
-        <div class="card-head"><h2 data-i18n="verify.title">核对结果</h2></div>
-        <button id="verifyBtn" class="btn" data-i18n="verify.start">开始核对</button>
-        <div id="verifyProgress" class="progress hidden"></div>
-        <div id="verifySummary" class="summary"></div>
-      </section>
-
-      <section class="card" id="card-log">
-        <div class="card-head"><h2 data-i18n="log.title">运行日志</h2></div>
+      <details class="card advanced">
+        <summary data-i18n="log.title">运行日志</summary>
         <pre id="log" class="log"></pre>
-      </section>
+      </details>
     </main>
   </div>
 

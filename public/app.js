@@ -9,6 +9,32 @@ const I18N = {
   "steps.write": { zh: "写入", en: "Write" },
   "steps.verify": { zh: "核对", en: "Verify" },
   "sidebar.note": { zh: "数据仅保存在本机 data 目录", en: "Data stays in the local data folder" },
+  "guide.kicker": { zh: "当前建议", en: "Next step" },
+  "guide.connect": { zh: "先确认网易云和 Spotify 都已连接。", en: "Confirm that both NetEase and Spotify are connected." },
+  "guide.export": { zh: "网易云已连接，下一步是导出歌单。", en: "NetEase is connected. Export your playlists next." },
+  "guide.select": {
+    zh: "在“选择歌单并匹配”里勾选这一批歌单，每批不超过 700 首。",
+    en: "Select a batch of playlists under “Choose playlists and match”; keep it under 700 tracks.",
+  },
+  "guide.write": {
+    zh: "匹配已完成。检查结果后，再决定是否写入 Spotify。",
+    en: "Matching is complete. Review the result before writing to Spotify.",
+  },
+  "guide.verify": {
+    zh: "写入已完成，最后点“开始核对”检查目标歌单。",
+    en: "Writing is complete. Run verification to check the destination playlists.",
+  },
+  "accounts.title": { zh: "账号与数据", en: "Accounts & data" },
+  "accounts.subtitle": { zh: "先连接账号，再导出歌单。", en: "Connect both accounts, then export playlists." },
+  "playlists.title": { zh: "选择歌单并匹配", en: "Choose playlists & match" },
+  "playlists.hint": {
+    zh: "勾选这一批要迁移的歌单。点歌单名称是查看详情，勾选左侧“选择”才会加入批次。",
+    en: "Select the playlists for this batch. Clicking the name opens details; check “Select” to include it.",
+  },
+  "write.title": { zh: "写入与核对", en: "Write & verify" },
+  "write.hint": { zh: "匹配完成后，再确认写入 Spotify。", en: "After matching, confirm the write to Spotify." },
+  "advanced.services": { zh: "高级信息：支持的服务", en: "Advanced: supported services" },
+  "advanced.tracks": { zh: "高级信息：全部导出歌曲", en: "Advanced: all exported tracks" },
   "flow.title": { zh: "这次要迁移什么", en: "What to migrate" },
   "flow.swap": { zh: "⇄ 交换", en: "⇄ Swap" },
   "flow.from": { zh: "从", en: "From" },
@@ -85,6 +111,13 @@ const I18N = {
   },
   "match.delay": { zh: "每次搜索间隔（毫秒，至少 3000）", en: "Delay between searches (ms, 3000 minimum)" },
   "match.start": { zh: "匹配所选歌单", en: "Match selected playlists" },
+  "plan.unique": { zh: "本批曲目", en: "Batch tracks" },
+  "plan.matched": { zh: "匹配成功", en: "Matched" },
+  "plan.review": { zh: "待确认", en: "Review" },
+  "plan.unmatched": { zh: "未找到", en: "Unmatched" },
+  "plan.playlists": { zh: "待创建歌单", en: "Playlists to create" },
+  "plan.liked": { zh: "待写入喜欢", en: "Liked to write" },
+  "plan.items": { zh: "待写入曲目", en: "Items to write" },
   "common.cancel": { zh: "取消", en: "Cancel" },
   "common.loadMore": { zh: "加载更多", en: "Load more" },
   "tracks.title": { zh: "已导出的歌曲", en: "Exported tracks" },
@@ -444,6 +477,35 @@ function animateNumber(el, to) {
   requestAnimationFrame(step);
 }
 
+function updateGuide(state) {
+  let key = "guide.connect";
+  if (state.netease && state.spotify && !state.source) key = "guide.export";
+  else if (state.netease && state.spotify && state.source && !state.plan) key = "guide.select";
+  else if (state.plan && !state.applied) key = "guide.write";
+  else if (state.applied) key = "guide.verify";
+  $("nextStepText").textContent = t(key);
+}
+
+function renderPlanSummary(summary) {
+  if (!summary) return;
+  const counts = summary.match_status_counts || {};
+  const stats = [
+    [t("plan.unique"), summary.unique_tracks || 0],
+    [t("plan.matched"), counts.matched || 0],
+    [t("plan.review"), counts.review || 0],
+    [t("plan.unmatched"), counts.unmatched || 0],
+    [t("plan.playlists"), summary.playlists_to_create || 0],
+    [t("plan.liked"), summary.pending_liked || 0],
+    [t("plan.items"), summary.pending_playlist_items || 0],
+  ];
+  $("planSummary").innerHTML = `<div class="plan-grid">${stats
+    .map(
+      ([label, value]) =>
+        `<div class="plan-stat"><b>${Number(value).toLocaleString("en-US")}</b><span>${escapeHtml(label)}</span></div>`,
+    )
+    .join("")}</div>`;
+}
+
 async function pollJob(jobId, progressEl, onDone) {
   for (;;) {
     const job = await api(`/api/job/${jobId}`);
@@ -488,16 +550,17 @@ async function refreshState() {
     animateNumber($('statUnique'), state.source.unique_tracks);
   }
   if (state.plan) {
-    $('planSummary').textContent = JSON.stringify(state.plan, null, 2);
+    renderPlanSummary(state.plan);
   }
   if (state.applied) {
     $('applySummary').textContent = JSON.stringify(state.applied, null, 2);
   }
+  updateGuide(state);
   let activeStep = 1;
   if (state.source) activeStep = Math.max(activeStep, 2);
-  if (state.spotify) activeStep = Math.max(activeStep, 2);
-  if (state.plan) activeStep = Math.max(activeStep, 3);
-  if (state.applied) activeStep = Math.max(activeStep, 4);
+  if (state.source && state.spotify) activeStep = Math.max(activeStep, 3);
+  if (state.plan) activeStep = Math.max(activeStep, 4);
+  if (state.applied) activeStep = Math.max(activeStep, 5);
   setStep(activeStep);
   if (state.source) {
     await loadExportedPlaylists();
@@ -647,12 +710,19 @@ function updateBatchInfo() {
   if (!info) return;
   const { playlists, tracks } = selectedBatchStats();
   info.classList.toggle("warning", tracks > 700);
+  let text;
   if (!playlists) {
-    info.textContent = t("batch.none");
+    text = t("batch.none");
   } else if (tracks > 700) {
-    info.textContent = t("batch.tooMany", { tracks });
+    text = t("batch.tooMany", { tracks });
   } else {
-    info.textContent = t("batch.selected", { playlists, tracks });
+    text = t("batch.selected", { playlists, tracks });
+  }
+  info.textContent = text;
+  const bottom = $("batchInfoBottom");
+  if (bottom) {
+    bottom.textContent = text;
+    bottom.classList.toggle("warning", tracks > 700);
   }
   const button = $("matchBtn");
   if (button) {
