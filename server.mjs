@@ -699,9 +699,14 @@ function sourceTargets() {
   return targets;
 }
 
-async function runMatch(job, delay) {
+async function runMatch(job, delay, selection = null) {
   if (!source) throw new Error('请先导出网易云歌单。');
-  const targets = sourceTargets();
+  let targets = sourceTargets();
+  if (Array.isArray(selection) && selection.length) {
+    const selected = new Set(selection.map(String));
+    targets = targets.filter((target) => selected.has(target.key));
+  }
+  if (!targets.length) throw new Error('请先选择要匹配的歌单。');
   const unique = new Map();
   for (const target of targets) {
     for (const t of target.tracks) {
@@ -1045,8 +1050,9 @@ async function routeApi(req, res, pathname, method) {
   }
   if (pathname === '/api/match' && method === 'POST') {
     const body = await readBody(req);
-    const delay = Number(body.delay ?? 500);
-    const id = startJob('match', (job) => runMatch(job, delay));
+    const delay = Math.max(3000, Number(body.delay ?? 3000));
+    const selection = Array.isArray(body.playlists) ? body.playlists : null;
+    const id = startJob('match', (job) => runMatch(job, delay, selection));
     return sendJson(res, 202, { jobId: id });
   }
   if (pathname === '/api/apply' && method === 'POST') {

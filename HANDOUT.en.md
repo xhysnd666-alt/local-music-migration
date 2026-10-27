@@ -29,6 +29,10 @@ Spotify Web API apps require a Premium account. No Client Secret is needed.
 4. After approval, click “Confirm & write”.
 5. Click “Start verification” to check the result.
 
+## Batch migration
+
+Select the playlists for this batch under “Exported playlists”, then start matching. Each batch is limited to 700 tracks. After writing and verifying that batch, return and select the next one. For the first run, test with a playlist of 100–300 tracks.
+
 ## Troubleshooting
 
 **Spotify 429**

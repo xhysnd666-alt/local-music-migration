@@ -135,6 +135,13 @@
           <span class="hint" id="exportedCount"></span>
         </div>
         <p class="hint" data-i18n="exported.hint">这些是本次已读取到的歌单；点开任意一项可以核对具体曲目。</p>
+        <div class="batch-toolbar">
+          <span id="batchInfo" data-i18n="batch.none">未选择歌单</span>
+          <div>
+            <button id="selectAllBtn" class="btn subtle" data-i18n="batch.selectAll">全选</button>
+            <button id="clearSelectionBtn" class="btn subtle" data-i18n="batch.clear">清空选择</button>
+          </div>
+        </div>
         <input id="playlistSearch" class="playlist-search" type="text" data-i18n-placeholder="exported.search" placeholder="搜索歌单">
         <div id="exportedList" class="playlist-list"></div>
         <div id="failedExports" class="failed-exports"></div>
@@ -161,6 +168,7 @@
           <h2 data-i18n="match.title">匹配预览</h2>
           <span class="hint" data-i18n="match.hint">只读取，不会写入你的 Spotify</span>
         </div>
+        <p class="hint" data-i18n="match.selectionHint">只匹配“已导出的歌单”中勾选的歌单；每批最多 700 首。</p>
         <label class="field">
           <span data-i18n="match.delay">每次搜索间隔（毫秒，至少 3000）</span>
           <input id="delay" type="number" value="3000" min="3000" step="250">

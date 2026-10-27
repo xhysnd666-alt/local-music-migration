@@ -49,6 +49,17 @@ const I18N = {
   "exported.collapse": { zh: "收起", en: "Collapse" },
   "exported.loading": { zh: "加载中...", en: "Loading..." },
   "exported.count": { zh: "共 {count} 个歌单", en: "{count} playlists" },
+  "batch.none": { zh: "未选择歌单", en: "No playlists selected" },
+  "batch.selected": {
+    zh: "已选 {playlists} 个歌单，共 {tracks} 首（上限 700）",
+    en: "{playlists} playlists selected, {tracks} tracks (limit 700)",
+  },
+  "batch.tooMany": {
+    zh: "本批 {tracks} 首，超过 700 首上限。请减少歌单后再开始。",
+    en: "This batch has {tracks} tracks, above the 700-track limit. Select fewer playlists.",
+  },
+  "batch.selectAll": { zh: "全选", en: "Select all" },
+  "batch.clear": { zh: "清空选择", en: "Clear" },
   "stats.liked": { zh: "喜欢歌曲", en: "Liked songs" },
   "stats.playlists": { zh: "歌单", en: "Playlists" },
   "stats.entries": { zh: "总条目", en: "Entries" },
@@ -61,6 +72,10 @@ const I18N = {
   "spotify.redirect": { zh: "回调地址：", en: "Redirect URI: " },
   "match.title": { zh: "匹配预览", en: "Match preview" },
   "match.hint": { zh: "只读取，不会写入你的 Spotify", en: "Read-only, nothing is written" },
+  "match.selectionHint": {
+    zh: "只匹配“已导出的歌单”中勾选的歌单；每批最多 700 首。",
+    en: "Only selected playlists from “Exported playlists” are matched; each batch is limited to 700 tracks.",
+  },
   "match.delay": { zh: "每次搜索间隔（毫秒，至少 3000）", en: "Delay between searches (ms, 3000 minimum)" },
   "match.start": { zh: "开始匹配预览", en: "Start match preview" },
   "common.cancel": { zh: "取消", en: "Cancel" },
@@ -93,6 +108,10 @@ const I18N = {
   "log.exportDone": { zh: "导出完成", en: "Export finished" },
   "log.exportFailed": { zh: "导出失败：{error}", en: "Export failed: {error}" },
   "log.clientIdRequired": { zh: "请先填写 Spotify Client ID", en: "Enter your Spotify Client ID first" },
+  "log.selectBatch": {
+    zh: "请先在“已导出的歌单”中勾选本批要迁移的歌单。",
+    en: "Select the playlists for this batch under “Exported playlists” first.",
+  },
   "log.spotifyWindow": {
     zh: "授权窗口已打开，完成后回来刷新状态",
     en: "Authorization window opened, come back and refresh when done",
@@ -467,6 +486,7 @@ function escapeHtml(value) {
 
 let exportedData = null;
 const exportedOpen = new Set();
+const selectedPlaylists = new Set();
 const exportedTrackLimit = new Map();
 const exportedTrackCache = new Map();
 
@@ -511,14 +531,17 @@ function renderExportedList() {
     .map(
       (row) => `
       <div class="playlist-item" data-key="${escapeHtml(row.key)}">
-        <button class="playlist-row">
-          <span class="playlist-chevron">›</span>
-          <span class="playlist-name">${escapeHtml(row.name)}</span>
-          <span class="playlist-pills">
-            <span class="pill available">${row.available} ${t("exported.available")}</span>
-            ${row.unavailable ? `<span class="pill missing">${row.unavailable} ${t("exported.missing")}</span>` : ""}
-          </span>
-        </button>
+        <div class="playlist-row-wrap">
+          <input class="playlist-check" type="checkbox" data-key="${escapeHtml(row.key)}" ${selectedPlaylists.has(row.key) ? "checked" : ""}>
+          <button class="playlist-row">
+            <span class="playlist-chevron">›</span>
+            <span class="playlist-name">${escapeHtml(row.name)}</span>
+            <span class="playlist-pills">
+              <span class="pill available">${row.available} ${t("exported.available")}</span>
+              ${row.unavailable ? `<span class="pill missing">${row.unavailable} ${t("exported.missing")}</span>` : ""}
+            </span>
+          </button>
+        </div>
         <div class="playlist-detail hidden"></div>
       </div>`
     )
@@ -527,12 +550,49 @@ function renderExportedList() {
   $("exportedList").querySelectorAll(".playlist-item").forEach((item) => {
     const key = item.dataset.key;
     const row = item.querySelector(".playlist-row");
+    const checkbox = item.querySelector(".playlist-check");
     row.addEventListener("click", () => togglePlaylistDetail(key, item));
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) selectedPlaylists.add(key);
+      else selectedPlaylists.delete(key);
+      updateBatchInfo();
+    });
     if (exportedOpen.has(key)) {
       item.classList.add("open");
       loadPlaylistDetail(key, item.querySelector(".playlist-detail"));
     }
   });
+  updateBatchInfo();
+}
+
+function selectedBatchStats() {
+  const rows = new Map(exportedRows().map((row) => [row.key, row]));
+  let playlists = 0;
+  let tracks = 0;
+  for (const key of selectedPlaylists) {
+    const row = rows.get(key);
+    if (!row) {
+      selectedPlaylists.delete(key);
+      continue;
+    }
+    playlists += 1;
+    tracks += row.available;
+  }
+  return { playlists, tracks };
+}
+
+function updateBatchInfo() {
+  const info = $("batchInfo");
+  if (!info) return;
+  const { playlists, tracks } = selectedBatchStats();
+  info.classList.toggle("warning", tracks > 700);
+  if (!playlists) {
+    info.textContent = t("batch.none");
+  } else if (tracks > 700) {
+    info.textContent = t("batch.tooMany", { tracks });
+  } else {
+    info.textContent = t("batch.selected", { playlists, tracks });
+  }
 }
 
 async function togglePlaylistDetail(key, item) {
@@ -680,10 +740,22 @@ async function logoutSpotify() {
 
 async function startMatch() {
   const delay = Math.max(3000, Number($('delay').value || 3000));
+  const stats = selectedBatchStats();
+  if (!stats.playlists) {
+    log(t("log.selectBatch"));
+    return;
+  }
+  if (stats.tracks > 700) {
+    log(t("batch.tooMany", { tracks: stats.tracks }));
+    return;
+  }
   try {
     $('matchBtn').disabled = true;
     show($('cancelBtn'));
-    const { jobId } = await api('/api/match', { method: 'POST', body: JSON.stringify({ delay }) });
+    const { jobId } = await api('/api/match', {
+      method: 'POST',
+      body: JSON.stringify({ delay, playlists: [...selectedPlaylists] }),
+    });
     log(t("log.matchStart", { delay }));
     await pollJob(jobId, $('matchProgress'), (result) => {
       log(t("log.matchDone"));
@@ -772,6 +844,14 @@ document.querySelectorAll('.pick-toggle button').forEach((btn) => {
 });
 
 $('playlistSearch').addEventListener('input', renderExportedList);
+$('selectAllBtn').addEventListener('click', () => {
+  for (const row of exportedRows()) selectedPlaylists.add(row.key);
+  renderExportedList();
+});
+$('clearSelectionBtn').addEventListener('click', () => {
+  selectedPlaylists.clear();
+  renderExportedList();
+});
 
 document.querySelectorAll('.lang-toggle button').forEach((btn) => {
   btn.addEventListener('click', () => {

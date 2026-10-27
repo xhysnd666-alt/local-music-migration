@@ -54,6 +54,12 @@ Spotify currently requires a Premium account for Web API apps. Enter the Client 
 6. After approval, click “Confirm & write”. Liked songs go to Liked Songs; other playlists are recreated with their original names.
 7. Click “Start verification” and check the final destination state.
 
+## Batch migration
+
+You do not need to match all 16k songs at once. Select playlists under “Exported playlists” and the app will match and write only that batch, with a 700-track limit per batch. After finishing a batch, return to the list and select the next one. Cached matches are reused and are not queried again.
+
+For the first test, choose a playlist with 100–300 tracks, run the complete match/write/verify cycle, and then continue with the remaining batches. Playlists already created in Spotify are reused through migration markers.
+
 ## Data and security
 
 - `data/` stores local authorization state and exported data and is excluded by `.gitignore`.
