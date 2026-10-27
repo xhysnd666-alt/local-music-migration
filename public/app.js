@@ -66,6 +66,7 @@ const I18N = {
   },
   "batch.selectAll": { zh: "全选", en: "Select all" },
   "batch.clear": { zh: "清空选择", en: "Clear" },
+  "batch.select": { zh: "选择", en: "Select" },
   "stats.liked": { zh: "喜欢歌曲", en: "Liked songs" },
   "stats.playlists": { zh: "歌单", en: "Playlists" },
   "stats.entries": { zh: "总条目", en: "Entries" },
@@ -514,10 +515,26 @@ function escapeHtml(value) {
 }
 
 let exportedData = null;
+let matchRunning = false;
 const exportedOpen = new Set();
-const selectedPlaylists = new Set();
+const selectedPlaylists = new Set(
+  (() => {
+    try {
+      return JSON.parse(localStorage.getItem("migrate-selected-playlists") || "[]");
+    } catch {
+      return [];
+    }
+  })(),
+);
 const exportedTrackLimit = new Map();
 const exportedTrackCache = new Map();
+
+function saveSelectedPlaylists() {
+  localStorage.setItem(
+    "migrate-selected-playlists",
+    JSON.stringify([...selectedPlaylists]),
+  );
+}
 
 async function loadExportedPlaylists() {
   try {
@@ -568,9 +585,12 @@ function renderExportedList() {
         ? t("exported.matchPill", { cached: match.cached, available: row.available })
         : t("exported.matchNone");
       return `
-      <div class="playlist-item" data-key="${escapeHtml(row.key)}">
+      <div class="playlist-item ${selectedPlaylists.has(row.key) ? "selected" : ""}" data-key="${escapeHtml(row.key)}">
         <div class="playlist-row-wrap">
-          <input class="playlist-check" type="checkbox" data-key="${escapeHtml(row.key)}" ${selectedPlaylists.has(row.key) ? "checked" : ""}>
+          <label class="playlist-select">
+            <input class="playlist-check" type="checkbox" data-key="${escapeHtml(row.key)}" ${selectedPlaylists.has(row.key) ? "checked" : ""}>
+            <span>${t("batch.select")}</span>
+          </label>
           <button class="playlist-row">
             <span class="playlist-chevron">›</span>
             <span class="playlist-name">${escapeHtml(row.name)}</span>
@@ -594,6 +614,8 @@ function renderExportedList() {
     checkbox.addEventListener("change", () => {
       if (checkbox.checked) selectedPlaylists.add(key);
       else selectedPlaylists.delete(key);
+      item.classList.toggle("selected", checkbox.checked);
+      saveSelectedPlaylists();
       updateBatchInfo();
     });
     if (exportedOpen.has(key)) {
@@ -631,6 +653,10 @@ function updateBatchInfo() {
     info.textContent = t("batch.tooMany", { tracks });
   } else {
     info.textContent = t("batch.selected", { playlists, tracks });
+  }
+  const button = $("matchBtn");
+  if (button) {
+    button.disabled = matchRunning || !playlists || tracks > 700;
   }
 }
 
@@ -840,6 +866,7 @@ async function startMatch() {
     return;
   }
   try {
+    matchRunning = true;
     $('matchBtn').disabled = true;
     show($('cancelBtn'));
     const { jobId } = await api('/api/match', {
@@ -855,7 +882,8 @@ async function startMatch() {
   } catch (err) {
     log(t("log.matchFailed", { error: err.message }));
   } finally {
-    $('matchBtn').disabled = false;
+    matchRunning = false;
+    updateBatchInfo();
     show($('cancelBtn'), false);
   }
 }
@@ -945,10 +973,12 @@ $('trackSearch').addEventListener('input', () => {
 $('loadMoreTracks').addEventListener('click', () => loadTrackRows(false));
 $('selectAllBtn').addEventListener('click', () => {
   for (const row of exportedRows()) selectedPlaylists.add(row.key);
+  saveSelectedPlaylists();
   renderExportedList();
 });
 $('clearSelectionBtn').addEventListener('click', () => {
   selectedPlaylists.clear();
+  saveSelectedPlaylists();
   renderExportedList();
 });
 

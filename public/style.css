@@ -483,6 +483,10 @@ select:focus, input:focus {
 .playlist-item + .playlist-item {
   border-top: 1px solid var(--border);
 }
+.playlist-item.selected {
+  background: #f4fbf6;
+  box-shadow: inset 3px 0 0 var(--spotify);
+}
 .playlist-row-wrap {
   display: flex;
   align-items: center;
@@ -495,6 +499,16 @@ select:focus, input:focus {
   flex: 0 0 auto;
   accent-color: var(--spotify);
   cursor: pointer;
+}
+.playlist-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 .playlist-row {
   width: 100%;
