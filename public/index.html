@@ -159,6 +159,10 @@
         </div>
         <p class="hint" data-i18n="playlists.hint">勾选这一批要迁移的歌单。点歌单名称是查看详情，勾选左侧“选择”才会加入批次。</p>
         <div id="cacheSummary" class="cache-summary"></div>
+        <div class="review-tools">
+          <p class="review-tip" data-i18n="exported.reviewTip">核对内容：歌单数量和曲目数、每首歌的歌手信息、以及当前的匹配状态。</p>
+          <button id="openTracksBtn" class="btn subtle" data-i18n="exported.viewTracks">查看全部导出歌曲</button>
+        </div>
 
         <div class="batch-toolbar">
           <span id="batchInfo" data-i18n="batch.none">未选择歌单</span>
@@ -216,7 +220,7 @@
         <div id="verifySummary" class="summary"></div>
       </section>
 
-      <details class="card advanced">
+      <details class="card advanced" id="tracksDetails" open>
         <summary data-i18n="advanced.services">高级信息：支持的服务</summary>
         <div class="pick-toggle">
           <button class="active" data-mode="source" data-i18n="services.pickSource">设为来源</button>

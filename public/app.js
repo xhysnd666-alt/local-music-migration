@@ -81,6 +81,11 @@ const I18N = {
   },
   "exported.matchPill": { zh: "匹配 {cached}/{available}", en: "Matched {cached}/{available}" },
   "exported.matchNone": { zh: "未开始匹配", en: "Not matched" },
+  "exported.reviewTip": {
+    zh: "核对内容：歌单数量和曲目数、每首歌的歌手信息、以及当前的匹配状态。",
+    en: "Check playlist counts, track artists, and each track's current match status.",
+  },
+  "exported.viewTracks": { zh: "查看全部导出歌曲", en: "View all exported tracks" },
   "batch.none": { zh: "未选择歌单", en: "No playlists selected" },
   "batch.selected": {
     zh: "已选 {playlists} 个歌单，共 {tracks} 首（上限 700）",
@@ -1041,6 +1046,11 @@ $('trackSearch').addEventListener('input', () => {
   trackSearchTimer = setTimeout(() => loadTrackRows(true), 280);
 });
 $('loadMoreTracks').addEventListener('click', () => loadTrackRows(false));
+$('openTracksBtn').addEventListener('click', () => {
+  const details = $('tracksDetails');
+  details.open = true;
+  details.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 $('selectAllBtn').addEventListener('click', () => {
   for (const row of exportedRows()) selectedPlaylists.add(row.key);
   saveSelectedPlaylists();

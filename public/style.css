@@ -501,6 +501,27 @@ select:focus, input:focus {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
+.review-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #dbe5f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.review-tip {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.review-tools .btn {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  font-size: 12px;
+}
 .batch-toolbar > div {
   display: flex;
   gap: 6px;
@@ -970,4 +991,5 @@ code {
   }
   .match-action-bar .row { justify-content: flex-end; }
   .plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review-tools { align-items: flex-start; flex-direction: column; }
 }
