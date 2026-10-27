@@ -206,6 +206,19 @@
           <span class="hint" id="reviewCount"></span>
         </div>
         <p class="hint" data-i18n="review.hint">系统找到了候选，但信心不足。选择正确的 Spotify 候选项后点“采用”，也可以跳过。</p>
+        <div class="review-toolbar">
+          <label>
+            <span data-i18n="review.scoreFilter">匹配度筛选</span>
+            <select id="reviewScoreFilter">
+              <option value="0-1" data-i18n="review.scoreAll">全部匹配度</option>
+              <option value="0.9-1" data-i18n="review.scoreVeryHigh">90% 以上</option>
+              <option value="0.75-0.899999" data-i18n="review.scoreHigh">75%–89%</option>
+              <option value="0.5-0.749999" data-i18n="review.scoreMid">50%–74%</option>
+              <option value="0-0.499999" data-i18n="review.scoreLow">50% 以下</option>
+            </select>
+          </label>
+          <button id="bulkAcceptReviewBtn" class="btn primary" data-i18n="review.bulk">一键确认当前筛选</button>
+        </div>
         <input id="reviewSearch" class="playlist-search" type="text" data-i18n-placeholder="review.search" placeholder="搜索待确认歌曲或歌手">
         <div id="reviewList" class="review-list"></div>
         <button id="loadMoreReviews" class="btn subtle hidden" data-i18n="common.loadMore">加载更多</button>

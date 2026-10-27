@@ -62,6 +62,8 @@ For the first test, choose a playlist with 100–300 tracks, run the complete ma
 
 If some tracks cannot be matched yet, enable “Allow partial write”: matched tracks are written first and unmatched tracks are skipped. Re-select the same playlist later to reuse the existing Spotify playlist and append the missing tracks.
 
+The “Tracks to review” panel supports confidence filters. High-confidence items can be bulk-confirmed using their best candidate; items below 50% should be reviewed individually, replaced with another candidate, or skipped.
+
 ## Data and security
 
 - `data/` stores local authorization state and exported data and is excluded by `.gitignore`.

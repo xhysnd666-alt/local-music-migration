@@ -1143,6 +1143,8 @@ async function routeApi(req, res, pathname, method) {
     const query = String(params.get('q') || '').trim().toLowerCase();
     const offset = Math.max(0, Number(params.get('offset') || 0));
     const limit = Math.min(50, Math.max(1, Number(params.get('limit') || 20)));
+    const minScore = Number(params.get('minScore') || 0);
+    const maxScore = Number(params.get('maxScore') || 1);
     const sourceKey = String(source.exported_at || source.user?.uid || 'source');
     const cache = loadMatchProgress(sourceKey);
     const index = buildSourceTrackIndex();
@@ -1151,6 +1153,8 @@ async function routeApi(req, res, pathname, method) {
       if (result.status !== 'review') continue;
       const entry = index.get(trackId);
       if (!entry || !result.candidates?.length) continue;
+      const topScore = Number(result.candidates[0]?.score || 0);
+      if (topScore < minScore || topScore > maxScore) continue;
       const haystack = [
         entry.track.name,
         entry.track.album,
@@ -1165,15 +1169,41 @@ async function routeApi(req, res, pathname, method) {
         source: entry.track,
         playlists: [...entry.playlists],
         candidates: result.candidates.slice(0, 5),
+        top_score: topScore,
         current_match: result.match || null,
       });
     }
+    rows.sort((a, b) => a.top_score - b.top_score);
     return sendJson(res, 200, {
       total: rows.length,
       offset,
       limit,
       rows: rows.slice(offset, offset + limit),
     });
+  }
+  if (pathname === '/api/review/bulk-accept' && method === 'POST') {
+    if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });
+    const body = await readBody(req);
+    const minScore = Number(body.minScore ?? 0);
+    const maxScore = Number(body.maxScore ?? 1);
+    const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+    const cache = loadMatchProgress(sourceKey);
+    let accepted = 0;
+    for (const [trackId, result] of cache) {
+      if (result.status !== 'review') continue;
+      const candidate = result.candidates?.[0];
+      const score = Number(candidate?.score || 0);
+      if (!candidate?.uri || score < minScore || score > maxScore) continue;
+      appendMatchProgress(sourceKey, trackId, {
+        ...result,
+        status: 'matched',
+        reason: 'Bulk accepted',
+        match: candidate,
+        reviewed_at: new Date().toISOString(),
+      });
+      accepted += 1;
+    }
+    return sendJson(res, 200, { ok: true, accepted });
   }
   if (pathname === '/api/review/accept' && method === 'POST') {
     if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });

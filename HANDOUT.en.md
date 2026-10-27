@@ -35,6 +35,8 @@ Select the playlists for this batch under “Exported playlists”, then start m
 
 If some tracks cannot be matched yet, enable “Allow partial write”. Only matched tracks are written; selecting the same playlist later reuses the existing Spotify playlist and appends the missing tracks.
 
+Use confidence filters in “Tracks to review”: 75%+ is usually safe for bulk confirmation, while items below 50% should be checked individually.
+
 ## Troubleshooting
 
 **Spotify 429**

@@ -143,6 +143,18 @@ const I18N = {
   },
   "review.search": { zh: "搜索待确认歌曲或歌手", en: "Search tracks or artists to review" },
   "review.count": { zh: "还有 {count} 首待确认", en: "{count} tracks to review" },
+  "review.scoreFilter": { zh: "匹配度筛选", en: "Match confidence" },
+  "review.scoreAll": { zh: "全部匹配度", en: "All confidence levels" },
+  "review.scoreVeryHigh": { zh: "90% 以上", en: "90% and above" },
+  "review.scoreHigh": { zh: "75%–89%", en: "75%–89%" },
+  "review.scoreMid": { zh: "50%–74%", en: "50%–74%" },
+  "review.scoreLow": { zh: "50% 以下", en: "Below 50%" },
+  "review.bulk": { zh: "一键确认当前筛选", en: "Confirm filtered matches" },
+  "review.bulkConfirm": {
+    zh: "将对当前筛选范围内的 {count} 首歌曲采用各自的最佳候选，继续吗？",
+    en: "Use the best candidate for all {count} filtered tracks?",
+  },
+  "review.bulkDone": { zh: "已批量确认 {count} 首", en: "{count} tracks confirmed" },
   "review.source": { zh: "网易云原曲", en: "NetEase source" },
   "review.candidate": { zh: "Spotify 候选", en: "Spotify candidate" },
   "review.accept": { zh: "采用", en: "Use" },
@@ -834,6 +846,13 @@ let reviewTotal = 0;
 let reviewLoading = false;
 let reviewSearchTimer = null;
 
+function reviewScoreRange() {
+  const [minScore, maxScore] = ($("reviewScoreFilter")?.value || "0-1")
+    .split("-")
+    .map(Number);
+  return { minScore, maxScore };
+}
+
 function trackStatusLabel(status) {
   return t(`track.status.${status || "not_matched"}`);
 }
@@ -893,10 +912,12 @@ async function loadReviewItems(reset = false) {
       q: query,
       offset: String(reviewOffset),
       limit: "20",
+      ...reviewScoreRange(),
     });
     const data = await api(`/api/review?${params.toString()}`);
     reviewTotal = data.total;
     $("reviewCount").textContent = t("review.count", { count: data.total });
+    $("bulkAcceptReviewBtn").disabled = data.total === 0;
     if (!data.rows?.length && reset) {
       $("reviewList").innerHTML = `<div class="playlist-empty">${t("review.empty")}</div>`;
     } else {
@@ -912,7 +933,7 @@ async function loadReviewItems(reset = false) {
                 <span>${escapeHtml((row.source.artists || []).join(" / "))} · ${escapeHtml((row.playlists || []).join(" / "))}</span>
               </div>
               <div class="review-choice">
-                <small>${t("review.candidate")}</small>
+                <small>${t("review.candidate")} · ${Math.round((row.top_score || 0) * 100)}%</small>
                 <select class="review-candidate">
                   ${(row.candidates || [])
                     .map(
@@ -1163,6 +1184,25 @@ $('loadMoreTracks').addEventListener('click', () => loadTrackRows(false));
 $('reviewSearch').addEventListener('input', () => {
   clearTimeout(reviewSearchTimer);
   reviewSearchTimer = setTimeout(() => loadReviewItems(true), 280);
+});
+$('reviewScoreFilter').addEventListener('change', () => loadReviewItems(true));
+$('bulkAcceptReviewBtn').addEventListener('click', async () => {
+  if (reviewTotal <= 0) return;
+  if (!confirm(t("review.bulkConfirm", { count: reviewTotal }))) return;
+  const button = $('bulkAcceptReviewBtn');
+  button.disabled = true;
+  try {
+    const result = await api("/api/review/bulk-accept", {
+      method: "POST",
+      body: JSON.stringify(reviewScoreRange()),
+    });
+    log(t("review.bulkDone", { count: result.accepted || 0 }));
+    await refreshState();
+  } catch (err) {
+    log(err.message);
+  } finally {
+    button.disabled = reviewTotal === 0;
+  }
 });
 $('loadMoreReviews').addEventListener('click', () => loadReviewItems(false));
 $('openTracksBtn').addEventListener('click', () => {
