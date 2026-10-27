@@ -23,7 +23,7 @@ Spotify Web API apps require a Premium account. No Client Secret is needed.
 
 ## Run the migration
 
-1. Open “Match preview” and set the search delay to 2000 ms.
+1. Open “Match preview” and set the search delay to at least 3000 ms. A 2000 ms interval can still hit Spotify search limits.
 2. Click “Start match preview” and wait for the counts.
 3. Review matched, review, and unmatched tracks.
 4. After approval, click “Confirm & write”.
