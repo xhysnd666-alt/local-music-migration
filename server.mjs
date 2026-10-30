@@ -514,7 +514,9 @@ async function spotifyRequest(method, pathname, params, body, retry = true) {
     if (res.status === 403 && pathname.startsWith('/search')) {
       throw new Error('Spotify 未授予目录搜索权限（403），请确认 App 已选择 Web API 且账号为 Premium。');
     }
-    throw new Error(`Spotify ${res.status}：${text.slice(0, 300)}`);
+    throw new Error(
+      `Spotify ${res.status}（${method} ${pathname}）：${text.slice(0, 300)}`,
+    );
   }
   return text ? JSON.parse(text) : null;
 }
@@ -925,7 +927,7 @@ async function runApply(job, allowPartial = false) {
       if (playlist) {
         summary.playlists_reused += 1;
       } else {
-        playlist = await spotifyRequest('POST', `/users/${encodeURIComponent(me.id)}/playlists`, null, {
+        playlist = await spotifyRequest('POST', '/me/playlists', null, {
           name: String(target.name).slice(0, 100),
           public: false,
           description: `Migrated from NetEase Cloud Music. ${marker}`.slice(0, 300),
@@ -971,6 +973,16 @@ async function runVerify(job) {
   let done = 0;
   job.progress = { done: 0, total, message: '开始核对' };
   for (const target of applied.targets) {
+    if (target.type === 'playlist' && !target.destination_playlist_id) {
+      for (const track of target.tracks) {
+        track.verify_status = 'not_applicable';
+        track.verify_reason = 'No matched tracks were available, so the playlist was not created.';
+        summary.not_applied += 1;
+        done += 1;
+      }
+      job.progress = { done, total, message: `核对 ${done}/${total}` };
+      continue;
+    }
     const uris = target.type === 'liked'
       ? saved
       : await playlistUris(target.destination_playlist_id);
