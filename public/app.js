@@ -123,6 +123,8 @@ const I18N = {
   "plan.playlists": { zh: "待创建歌单", en: "Playlists to create" },
   "plan.liked": { zh: "待写入喜欢", en: "Liked to write" },
   "plan.items": { zh: "待写入曲目", en: "Items to write" },
+  "plan.refresh": { zh: "刷新匹配结果", en: "Refresh match plan" },
+  "plan.refreshed": { zh: "匹配结果已刷新", en: "Match plan refreshed" },
   "common.cancel": { zh: "取消", en: "Cancel" },
   "common.loadMore": { zh: "加载更多", en: "Load more" },
   "tracks.title": { zh: "已导出的歌曲", en: "Exported tracks" },
@@ -1142,6 +1144,15 @@ $('exportBtn').addEventListener('click', startExport);
 $('spotifyLoginBtn').addEventListener('click', startSpotifyLogin);
 $('spotifyLogoutBtn').addEventListener('click', logoutSpotify);
 $('matchBtn').addEventListener('click', startMatch);
+$('refreshPlanBtn').addEventListener('click', async () => {
+  try {
+    await api('/api/plan/refresh', { method: 'POST', body: '{}' });
+    log(t('plan.refreshed'));
+    await refreshState();
+  } catch (err) {
+    log(err.message);
+  }
+});
 $('applyBtn').addEventListener('click', startApply);
 $('verifyBtn').addEventListener('click', startVerify);
 

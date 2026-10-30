@@ -852,6 +852,42 @@ async function saveLikedTracks(ids) {
   }
 }
 
+function refreshPlanFromCache() {
+  if (!plan || !source) return null;
+  const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+  const cache = loadMatchProgress(sourceKey);
+  const counts = {};
+  let pendingLiked = 0;
+  let pendingPlaylistItems = 0;
+  for (const target of plan.targets || []) {
+    for (const track of target.tracks || []) {
+      const id = String(track.source_track_id);
+      const result = cache.get(id);
+      if (result) {
+        track.status = result.status || 'unmatched';
+        track.reason = result.reason || '';
+        track.match = result.match || null;
+        track.candidates = result.candidates || [];
+        track.destination_uri = result.match?.uri || null;
+      }
+      counts[track.status] = (counts[track.status] || 0) + 1;
+      if (track.status === 'matched' && !track.already_present) {
+        if (target.type === 'liked') pendingLiked += 1;
+        else pendingPlaylistItems += 1;
+      }
+    }
+  }
+  plan.updated_from_cache_at = new Date().toISOString();
+  plan.summary = {
+    ...(plan.summary || {}),
+    match_status_counts: counts,
+    pending_liked: pendingLiked,
+    pending_playlist_items: pendingPlaylistItems,
+  };
+  saveJson(planPath, plan);
+  return plan.summary;
+}
+
 async function addPlaylistItems(playlistId, uris) {
   for (let i = 0; i < uris.length; i += 100) {
     await spotifyRequest('POST', `/playlists/${encodeURIComponent(playlistId)}/items`, null, {
@@ -1193,6 +1229,10 @@ async function routeApi(req, res, pathname, method) {
       rows: rows.slice(offset, offset + limit),
     });
   }
+  if (pathname === '/api/plan/refresh' && method === 'POST') {
+    if (!plan) return sendJson(res, 404, { error: '还没有匹配计划。' });
+    return sendJson(res, 200, { ok: true, summary: refreshPlanFromCache() });
+  }
   if (pathname === '/api/review/bulk-accept' && method === 'POST') {
     if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });
     const body = await readBody(req);
@@ -1215,6 +1255,7 @@ async function routeApi(req, res, pathname, method) {
       });
       accepted += 1;
     }
+    refreshPlanFromCache();
     return sendJson(res, 200, { ok: true, accepted });
   }
   if (pathname === '/api/review/accept' && method === 'POST') {
@@ -1238,6 +1279,7 @@ async function routeApi(req, res, pathname, method) {
       reviewed_at: new Date().toISOString(),
     };
     appendMatchProgress(sourceKey, trackId, updated);
+    refreshPlanFromCache();
     return sendJson(res, 200, { ok: true, result: updated });
   }
   if (pathname === '/api/review/skip' && method === 'POST') {
@@ -1258,6 +1300,7 @@ async function routeApi(req, res, pathname, method) {
       reviewed_at: new Date().toISOString(),
     };
     appendMatchProgress(sourceKey, trackId, updated);
+    refreshPlanFromCache();
     return sendJson(res, 200, { ok: true, result: updated });
   }
   if (pathname === '/api/netease/qr' && method === 'POST') {
