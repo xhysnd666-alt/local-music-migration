@@ -157,6 +157,22 @@ const I18N = {
     en: "Use the best candidate for all {count} filtered tracks?",
   },
   "review.bulkDone": { zh: "已批量确认 {count} 首", en: "{count} tracks confirmed" },
+  "imported.title": { zh: "Spotify 导入进度", en: "Spotify import progress" },
+  "imported.hint": {
+    zh: "查看已经写入 Spotify 的歌单和曲目数量；点击“继续导入”可以把未完成歌单加入下一批。",
+    en: "See what has already been written to Spotify. Click “Continue” to add an incomplete playlist to the next batch.",
+  },
+  "imported.refresh": { zh: "刷新进度", en: "Refresh progress" },
+  "imported.playlists": { zh: "已导入歌单", en: "Imported playlists" },
+  "imported.tracks": { zh: "已导入曲目", en: "Imported tracks" },
+  "imported.remaining": { zh: "待补充曲目", en: "Tracks remaining" },
+  "imported.liked": { zh: "Liked Songs", en: "Liked Songs" },
+  "imported.source": { zh: "源歌单", en: "Source" },
+  "imported.progress": { zh: "{imported}/{total}", en: "{imported}/{total}" },
+  "imported.remainingLabel": { zh: "还差 {count}", en: "{count} remaining" },
+  "imported.continue": { zh: "继续导入", en: "Continue" },
+  "imported.complete": { zh: "已完成", en: "Complete" },
+  "imported.empty": { zh: "还没有由本工具创建的 Spotify 歌单", en: "No Spotify playlists have been created by this tool yet." },
   "review.source": { zh: "网易云原曲", en: "NetEase source" },
   "review.candidate": { zh: "Spotify 候选", en: "Spotify candidate" },
   "review.accept": { zh: "采用", en: "Use" },
@@ -599,6 +615,9 @@ async function refreshState() {
     await loadTrackRows(true);
     await loadReviewItems(true);
   }
+  if (state.spotify && state.source && !importedLoaded) {
+    await loadImported();
+  }
 }
 
 function escapeHtml(value) {
@@ -847,6 +866,8 @@ let reviewOffset = 0;
 let reviewTotal = 0;
 let reviewLoading = false;
 let reviewSearchTimer = null;
+let importedLoaded = false;
+let importedLoading = false;
 
 function reviewScoreRange() {
   const [minScore, maxScore] = ($("reviewScoreFilter")?.value || "0-1")
@@ -999,6 +1020,56 @@ async function loadReviewItems(reset = false) {
   }
 }
 
+async function loadImported() {
+  if (importedLoading) return;
+  importedLoading = true;
+  try {
+    const data = await api("/api/spotify/imported");
+    const s = data.summary || {};
+    $("importedSummary").innerHTML = `
+      <div class="plan-stat"><b>${Number(s.imported_playlists || 0).toLocaleString("en-US")}</b><span>${t("imported.playlists")}</span></div>
+      <div class="plan-stat"><b>${Number(s.imported_tracks || 0).toLocaleString("en-US")}</b><span>${t("imported.tracks")}</span></div>
+      <div class="plan-stat"><b>${Number(s.remaining_tracks || 0).toLocaleString("en-US")}</b><span>${t("imported.remaining")}</span></div>
+      <div class="plan-stat"><b>${Number(s.liked_imported || 0).toLocaleString("en-US")}</b><span>${t("imported.liked")} ${t("imported.progress", { imported: s.liked_imported || 0, total: s.liked_total || 0 })}</span></div>`;
+    const rows = data.playlists || [];
+    if (!rows.length) {
+      $("importedList").innerHTML = `<div class="playlist-empty">${t("imported.empty")}</div>`;
+    } else {
+      $("importedList").innerHTML = rows
+        .map((row) => {
+          const pct = row.source_total ? Math.round((row.imported / row.source_total) * 100) : 0;
+          return `
+          <div class="imported-row">
+            <div class="imported-main">
+              <b>${escapeHtml(row.destination_name)}</b>
+              <span>${t("imported.source")}: ${escapeHtml(row.source_name)}</span>
+              <div class="imported-bar"><i style="width:${pct}%"></i></div>
+            </div>
+            <div class="imported-count">
+              <b>${t("imported.progress", { imported: row.imported, total: row.source_total })}</b>
+              <span>${row.remaining ? t("imported.remainingLabel", { count: row.remaining }) : t("imported.complete")}</span>
+            </div>
+            <button class="btn subtle continue-import" data-key="playlist:${escapeHtml(row.source_id)}">${t("imported.continue")}</button>
+          </div>`;
+        })
+        .join("");
+      $("importedList").querySelectorAll(".continue-import").forEach((button) => {
+        button.addEventListener("click", () => {
+          selectedPlaylists.add(button.dataset.key);
+          saveSelectedPlaylists();
+          renderExportedList();
+          $("card-exported").scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    }
+    importedLoaded = true;
+  } catch (err) {
+    log(t("log.loadStateFailed", { error: err.message }));
+  } finally {
+    importedLoading = false;
+  }
+}
+
 async function startNeteaseQr() {
   try {
     $('qrWrap').classList.add('hidden');
@@ -1115,6 +1186,7 @@ async function startApply() {
       log(t("log.applyDone"));
       show($('applyProgress'), false);
     });
+    importedLoaded = false;
     await refreshState();
   } catch (err) {
     log(t("log.applyFailed", { error: err.message }));
@@ -1152,6 +1224,10 @@ $('refreshPlanBtn').addEventListener('click', async () => {
   } catch (err) {
     log(err.message);
   }
+});
+$('refreshImportedBtn').addEventListener('click', async () => {
+  importedLoaded = false;
+  await loadImported();
 });
 $('applyBtn').addEventListener('click', startApply);
 $('verifyBtn').addEventListener('click', startVerify);

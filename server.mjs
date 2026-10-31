@@ -1303,6 +1303,77 @@ async function routeApi(req, res, pathname, method) {
     refreshPlanFromCache();
     return sendJson(res, 200, { ok: true, result: updated });
   }
+  if (pathname === '/api/spotify/imported' && method === 'GET') {
+    if (!source) return sendJson(res, 404, { error: '还没有导出歌单。' });
+    if (!spotifyAuth) return sendJson(res, 401, { error: 'Spotify 尚未授权。' });
+    const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+    const cache = loadMatchProgress(sourceKey);
+    const spotifyPlaylists = await userPlaylists();
+    const savedUris = await savedTrackUris();
+    const importedPlaylists = [];
+    let importedTracks = 0;
+    let remainingTracks = 0;
+    for (const sourcePlaylist of source.playlists || []) {
+      const marker = markerFor(sourcePlaylist.id);
+      const destination = spotifyPlaylists.find((p) =>
+        String(p.description || '').includes(marker),
+      );
+      if (!destination) continue;
+      let destinationUris;
+      try {
+        destinationUris = await playlistUris(destination.id);
+      } catch {
+        continue;
+      }
+      const ids = [...new Set((sourcePlaylist.tracks || []).map((t) => String(t.id)))];
+      let matched = 0;
+      let imported = 0;
+      for (const id of ids) {
+        const result = cache.get(id);
+        if (result?.status === 'matched') matched += 1;
+        if (result?.match?.uri && destinationUris.has(result.match.uri)) imported += 1;
+      }
+      importedTracks += imported;
+      remainingTracks += ids.length - imported;
+      importedPlaylists.push({
+        source_id: String(sourcePlaylist.id),
+        source_name: sourcePlaylist.name,
+        destination_id: destination.id,
+        destination_name: destination.name,
+        destination_url: destination.external_urls?.spotify || '',
+        source_total: ids.length,
+        source_matched: matched,
+        spotify_items: destinationUris.size,
+        imported,
+        remaining: ids.length - imported,
+      });
+    }
+    const likedIds = [
+      ...new Set((source.liked?.tracks || []).map((t) => String(t.id))),
+    ];
+    let likedImported = 0;
+    for (const id of likedIds) {
+      const result = cache.get(id);
+      if (result?.match?.uri && savedUris.has(result.match.uri)) likedImported += 1;
+    }
+    return sendJson(res, 200, {
+      summary: {
+        imported_playlists: importedPlaylists.length,
+        source_playlists: (source.playlists || []).length,
+        imported_tracks: importedTracks,
+        remaining_tracks: remainingTracks,
+        liked_imported: likedImported,
+        liked_total: likedIds.length,
+        liked_remaining: likedIds.length - likedImported,
+      },
+      liked: {
+        imported: likedImported,
+        total: likedIds.length,
+        remaining: likedIds.length - likedImported,
+      },
+      playlists: importedPlaylists.sort((a, b) => b.remaining - a.remaining),
+    });
+  }
   if (pathname === '/api/netease/qr' && method === 'POST') {
     const key = await neteaseQrKey();
     if (!key) return sendJson(res, 500, { error: '无法创建网易云登录二维码' });

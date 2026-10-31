@@ -248,7 +248,20 @@
         <div id="verifySummary" class="summary"></div>
       </section>
 
-      <details class="card advanced" id="tracksDetails" open>
+      <section class="card" id="card-imported">
+        <div class="card-head section-head">
+          <div>
+            <span class="section-step">✓</span>
+            <h2 data-i18n="imported.title">Spotify 导入进度</h2>
+          </div>
+          <button id="refreshImportedBtn" class="btn subtle" data-i18n="imported.refresh">刷新进度</button>
+        </div>
+        <p class="hint" data-i18n="imported.hint">查看已经写入 Spotify 的歌单和曲目数量；点击“继续导入”可以把未完成歌单加入下一批。</p>
+        <div id="importedSummary" class="plan-grid"></div>
+        <div id="importedList" class="imported-list"></div>
+      </section>
+
+      <details class="card advanced">
         <summary data-i18n="advanced.services">高级信息：支持的服务</summary>
         <div class="pick-toggle">
           <button class="active" data-mode="source" data-i18n="services.pickSource">设为来源</button>
@@ -258,7 +271,7 @@
         <div class="service-grid" id="serviceGrid"></div>
       </details>
 
-      <details class="card advanced">
+      <details class="card advanced" id="tracksDetails" open>
         <summary data-i18n="advanced.tracks">高级信息：全部导出歌曲</summary>
         <div class="card-head">
           <h2 data-i18n="tracks.title">已导出的歌曲</h2>

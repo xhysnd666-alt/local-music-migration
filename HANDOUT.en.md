@@ -37,6 +37,8 @@ If some tracks cannot be matched yet, enable “Allow partial write”. Only mat
 
 Use confidence filters in “Tracks to review”: 75%+ is usually safe for bulk confirmation, while items below 50% should be checked individually.
 
+“Spotify import progress” shows created playlists and remaining track counts. Click “Continue” to add the source playlist to the next batch.
+
 ## Troubleshooting
 
 **Spotify 429**

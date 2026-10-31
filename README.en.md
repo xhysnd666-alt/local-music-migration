@@ -64,6 +64,8 @@ If some tracks cannot be matched yet, enable “Allow partial write”: matched 
 
 The “Tracks to review” panel supports confidence filters. High-confidence items can be bulk-confirmed using their best candidate; items below 50% should be reviewed individually, replaced with another candidate, or skipped.
 
+The “Spotify import progress” panel lists playlists already created in Spotify, with imported/source counts and remaining tracks. Click “Continue” to add that source playlist to the next batch.
+
 ## Data and security
 
 - `data/` stores local authorization state and exported data and is excluded by `.gitignore`.
