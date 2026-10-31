@@ -58,6 +58,8 @@ Spotify currently requires a Premium account for Web API apps. Enter the Client 
 
 You do not need to match all 16k songs at once. Select playlists under “Exported playlists” and the app will match and write only that batch, with a 700-track limit per batch. After finishing a batch, return to the list and select the next one. Cached matches are reused and are not queried again.
 
+The per-batch limit can be adjusted from 100 to 1000 tracks. When “Liked songs” is selected, the app prioritizes matched tracks that have not yet been written, then adds uncached tracks, so all 3333 liked songs can be migrated in several batches.
+
 For the first test, choose a playlist with 100–300 tracks, run the complete match/write/verify cycle, and then continue with the remaining batches. Playlists already created in Spotify are reused through migration markers.
 
 If some tracks cannot be matched yet, enable “Allow partial write”: matched tracks are written first and unmatched tracks are skipped. Re-select the same playlist later to reuse the existing Spotify playlist and append the missing tracks.

@@ -729,7 +729,7 @@ function sourceTargets() {
   return targets;
 }
 
-async function runMatch(job, delay, selection = null) {
+async function runMatch(job, delay, selection = null, maxTracks = 700) {
   if (!source) throw new Error('请先导出网易云歌单。');
   let targets = sourceTargets();
   if (Array.isArray(selection) && selection.length) {
@@ -737,17 +737,44 @@ async function runMatch(job, delay, selection = null) {
     targets = targets.filter((target) => selected.has(target.key));
   }
   if (!targets.length) throw new Error('请先选择要匹配的歌单。');
-  const unique = new Map();
-  for (const target of targets) {
-    for (const t of target.tracks) {
-      if (t.id) unique.set(String(t.id), t);
-    }
-  }
   const me = await spotifyRequest('GET', '/me');
   spotifyUser = me;
   const market = me.country;
   const playlists = await userPlaylists();
   const saved = await savedTrackUris();
+  const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+  const cache = loadMatchProgress(sourceKey);
+  const unique = new Map();
+  let order = 0;
+  for (const target of targets) {
+    for (const track of target.tracks) {
+      const id = String(track.id);
+      if (!id || unique.has(id)) continue;
+      const result = cache.get(id);
+      const uri = result?.match?.uri;
+      let priority = 1;
+      if (result?.status === 'matched' && uri && !saved.has(uri)) priority = 0;
+      else if (result?.status === 'review') priority = 2;
+      else if (result?.status === 'unmatched') priority = 3;
+      else if (result?.status === 'matched' && uri && saved.has(uri)) priority = 4;
+      unique.set(id, { track, priority, order });
+      order += 1;
+    }
+  }
+  const limit = Math.max(1, Math.min(2000, Number(maxTracks) || 700));
+  const ordered = [...unique.values()]
+    .filter((entry) => entry.priority < 4)
+    .sort((a, b) => a.priority - b.priority || a.order - b.order)
+    .slice(0, limit)
+    .map((entry) => entry.track);
+  const selectedIds = new Set(ordered.map((track) => String(track.id)));
+  targets = targets
+    .map((target) => ({
+      ...target,
+      tracks: target.tracks.filter((track) => selectedIds.has(String(track.id))),
+    }))
+    .filter((target) => target.tracks.length);
+  if (!ordered.length) throw new Error('所选歌单中没有待迁移的曲目。');
   for (const target of targets) {
     if (target.type === 'liked') {
       target.existingUris = saved;
@@ -761,10 +788,7 @@ async function runMatch(job, delay, selection = null) {
       target.existingUris = existing ? await playlistUris(existing.id) : new Set();
     }
   }
-  const ordered = [...unique.values()];
   const total = ordered.length;
-  const sourceKey = String(source.exported_at || source.user?.uid || 'source');
-  const cache = loadMatchProgress(sourceKey);
   job.progress = { done: 0, total, message: `开始匹配（已有缓存 ${cache.size} 首）` };
   const matches = new Map();
   for (let i = 0; i < total; i += 1) {
@@ -1411,7 +1435,8 @@ async function routeApi(req, res, pathname, method) {
     const body = await readBody(req);
     const delay = Math.max(3000, Number(body.delay ?? 3000));
     const selection = Array.isArray(body.playlists) ? body.playlists : null;
-    const id = startJob('match', (job) => runMatch(job, delay, selection));
+    const maxTracks = Math.max(1, Math.min(2000, Number(body.maxTracks ?? 700)));
+    const id = startJob('match', (job) => runMatch(job, delay, selection, maxTracks));
     return sendJson(res, 202, { jobId: id });
   }
   if (pathname === '/api/apply' && method === 'POST') {

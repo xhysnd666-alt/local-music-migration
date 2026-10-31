@@ -167,6 +167,7 @@
         <div class="batch-toolbar">
           <span id="batchInfo" data-i18n="batch.none">未选择歌单</span>
           <div>
+            <button id="selectLikedBtn" class="btn subtle" data-i18n="batch.selectLiked">选择喜欢歌曲</button>
             <button id="selectAllBtn" class="btn subtle" data-i18n="batch.selectAll">全选</button>
             <button id="clearSelectionBtn" class="btn subtle" data-i18n="batch.clear">清空选择</button>
           </div>
@@ -178,6 +179,17 @@
         <div class="match-action-bar">
           <div class="match-action-info">
             <strong id="batchInfoBottom" data-i18n="batch.none">未选择歌单</strong>
+            <label class="inline-field">
+              <span data-i18n="match.maxTracks">每批最多</span>
+              <select id="maxTracks">
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="300">300</option>
+                <option value="500">500</option>
+                <option value="700" selected>700</option>
+                <option value="1000">1000</option>
+              </select>
+            </label>
             <label class="inline-field">
               <span data-i18n="match.delay">搜索间隔</span>
               <select id="delay">

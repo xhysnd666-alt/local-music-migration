@@ -88,16 +88,17 @@ const I18N = {
   "exported.viewTracks": { zh: "查看全部导出歌曲", en: "View all exported tracks" },
   "batch.none": { zh: "未选择歌单", en: "No playlists selected" },
   "batch.selected": {
-    zh: "已选 {playlists} 个歌单，共 {tracks} 首（上限 700）",
-    en: "{playlists} playlists selected, {tracks} tracks (limit 700)",
+    zh: "已选 {playlists} 个歌单，源曲目 {tracks} 首；本批最多处理 {limit} 首",
+    en: "{playlists} playlists selected, {tracks} source tracks; process up to {limit}",
   },
   "batch.tooMany": {
-    zh: "本批 {tracks} 首，超过 700 首上限。请减少歌单后再开始。",
-    en: "This batch has {tracks} tracks, above the 700-track limit. Select fewer playlists.",
+    zh: "已选 {tracks} 首，将按批次上限处理。",
+    en: "{tracks} tracks selected; the batch limit will be applied.",
   },
   "batch.selectAll": { zh: "全选", en: "Select all" },
   "batch.clear": { zh: "清空选择", en: "Clear" },
   "batch.select": { zh: "选择", en: "Select" },
+  "batch.selectLiked": { zh: "选择喜欢歌曲", en: "Select liked songs" },
   "stats.liked": { zh: "喜欢歌曲", en: "Liked songs" },
   "stats.playlists": { zh: "歌单", en: "Playlists" },
   "stats.entries": { zh: "总条目", en: "Entries" },
@@ -111,10 +112,11 @@ const I18N = {
   "match.title": { zh: "匹配预览", en: "Match preview" },
   "match.hint": { zh: "只读取，不会写入你的 Spotify", en: "Read-only, nothing is written" },
   "match.selectionHint": {
-    zh: "只匹配“已导出的歌单”中勾选的歌单；每批最多 700 首。",
-    en: "Only selected playlists from “Exported playlists” are matched; each batch is limited to 700 tracks.",
+    zh: "只匹配已勾选的歌单；每批最多处理你设置的曲目数量。",
+    en: "Only selected playlists are matched; each batch processes your chosen track limit.",
   },
   "match.delay": { zh: "搜索间隔（至少 3000 毫秒）", en: "Search interval (min 3000 ms)" },
+  "match.maxTracks": { zh: "每批最多", en: "Max per batch" },
   "match.start": { zh: "匹配所选歌单", en: "Match selected playlists" },
   "plan.unique": { zh: "本批曲目", en: "Batch tracks" },
   "plan.matched": { zh: "匹配成功", en: "Matched" },
@@ -225,7 +227,10 @@ const I18N = {
     en: "Authorization window opened, come back and refresh when done",
   },
   "log.spotifyLoginFailed": { zh: "Spotify 登录失败：{error}", en: "Spotify login failed: {error}" },
-  "log.matchStart": { zh: "开始匹配（间隔 {delay}ms）", en: "Matching started (delay {delay}ms)" },
+  "log.matchStart": {
+    zh: "开始匹配（本批最多 {maxTracks} 首，间隔 {delay}ms）",
+    en: "Matching started (up to {maxTracks} tracks, delay {delay}ms)",
+  },
   "log.matchDone": { zh: "匹配完成", en: "Matching finished" },
   "log.matchFailed": { zh: "匹配失败：{error}", en: "Matching failed: {error}" },
   "log.applyStart": { zh: "开始写入 Spotify", en: "Writing to Spotify" },
@@ -757,28 +762,32 @@ function selectedBatchStats() {
   return { playlists, tracks };
 }
 
+function batchLimit() {
+  return Math.max(1, Number($("maxTracks")?.value || 700));
+}
+
 function updateBatchInfo() {
   const info = $("batchInfo");
   if (!info) return;
   const { playlists, tracks } = selectedBatchStats();
-  info.classList.toggle("warning", tracks > 700);
+  const limit = batchLimit();
+  const capped = tracks > limit;
+  info.classList.toggle("warning", capped);
   let text;
   if (!playlists) {
     text = t("batch.none");
-  } else if (tracks > 700) {
-    text = t("batch.tooMany", { tracks });
   } else {
-    text = t("batch.selected", { playlists, tracks });
+    text = t("batch.selected", { playlists, tracks, limit });
   }
   info.textContent = text;
   const bottom = $("batchInfoBottom");
   if (bottom) {
     bottom.textContent = text;
-    bottom.classList.toggle("warning", tracks > 700);
+    bottom.classList.toggle("warning", capped);
   }
   const button = $("matchBtn");
   if (button) {
-    button.disabled = matchRunning || !playlists || tracks > 700;
+    button.disabled = matchRunning || !playlists;
   }
 }
 
@@ -1144,19 +1153,16 @@ async function startMatch() {
     log(t("log.selectBatch"));
     return;
   }
-  if (stats.tracks > 700) {
-    log(t("batch.tooMany", { tracks: stats.tracks }));
-    return;
-  }
+  const maxTracks = batchLimit();
   try {
     matchRunning = true;
     $('matchBtn').disabled = true;
     show($('cancelBtn'));
     const { jobId } = await api('/api/match', {
       method: 'POST',
-      body: JSON.stringify({ delay, playlists: [...selectedPlaylists] }),
+      body: JSON.stringify({ delay, maxTracks, playlists: [...selectedPlaylists] }),
     });
-    log(t("log.matchStart", { delay }));
+    log(t("log.matchStart", { delay, maxTracks }));
     await pollJob(jobId, $('matchProgress'), (result) => {
       log(t("log.matchDone"));
       show($('matchProgress'), false);
@@ -1302,11 +1308,17 @@ $('selectAllBtn').addEventListener('click', () => {
   saveSelectedPlaylists();
   renderExportedList();
 });
+$('selectLikedBtn').addEventListener('click', () => {
+  selectedPlaylists.add("liked");
+  saveSelectedPlaylists();
+  renderExportedList();
+});
 $('clearSelectionBtn').addEventListener('click', () => {
   selectedPlaylists.clear();
   saveSelectedPlaylists();
   renderExportedList();
 });
+$('maxTracks').addEventListener('change', updateBatchInfo);
 
 document.querySelectorAll('.lang-toggle button').forEach((btn) => {
   btn.addEventListener('click', () => {

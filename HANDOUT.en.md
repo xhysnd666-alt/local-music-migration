@@ -33,6 +33,8 @@ Spotify Web API apps require a Premium account. No Client Secret is needed.
 
 Select the playlists for this batch under “Exported playlists”, then start matching. Each batch is limited to 700 tracks. After writing and verifying that batch, return and select the next one. For the first run, test with a playlist of 100–300 tracks.
 
+The batch limit can be adjusted from 100 to 1000. Click “Select liked songs” to migrate the 3333 liked tracks in several batches.
+
 If some tracks cannot be matched yet, enable “Allow partial write”. Only matched tracks are written; selecting the same playlist later reuses the existing Spotify playlist and appends the missing tracks.
 
 Use confidence filters in “Tracks to review”: 75%+ is usually safe for bulk confirmation, while items below 50% should be checked individually.
