@@ -1027,6 +1027,76 @@ async function runApply(job, allowPartial = false) {
   return summary;
 }
 
+function buildPlanFromCache(selection = null) {
+  if (!source) throw new Error('请先导出网易云歌单。');
+  let targets = sourceTargets();
+  if (Array.isArray(selection) && selection.length) {
+    const selected = new Set(selection.map(String));
+    targets = targets.filter((target) => selected.has(target.key));
+  }
+  const sourceKey = String(source.exported_at || source.user?.uid || 'source');
+  const cache = loadMatchProgress(sourceKey);
+  const planTargets = [];
+  const counts = {};
+  let pendingLiked = 0;
+  let pendingPlaylistItems = 0;
+  for (const target of targets) {
+    const rows = [];
+    const seen = new Set();
+    for (const track of target.tracks || []) {
+      const id = String(track.id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const result = cache.get(id);
+      if (result?.status !== 'matched' || !result.match?.uri) continue;
+      rows.push({
+        source_track_id: id,
+        source_name: track.name,
+        source_artists: track.artists || [],
+        source_album: track.album || '',
+        source_duration_ms: track.duration_ms || 0,
+        status: 'matched',
+        reason: 'Matched from cache',
+        match: result.match,
+        candidates: result.candidates || [],
+        destination_uri: result.match.uri,
+        already_present: false,
+      });
+    }
+    if (!rows.length) continue;
+    counts.matched = (counts.matched || 0) + rows.length;
+    if (target.type === 'liked') pendingLiked += rows.length;
+    else pendingPlaylistItems += rows.length;
+    planTargets.push({
+      key: target.key,
+      type: target.type,
+      source_id: target.source_id,
+      name: target.name,
+      kind: target.kind,
+      destination_playlist_id: null,
+      will_create_playlist: true,
+      duplicate_track_count: 0,
+      unavailable_track_ids: target.unavailable_track_ids || [],
+      tracks: rows,
+    });
+  }
+  if (!planTargets.length) throw new Error('没有已匹配但尚未写入的歌曲。');
+  plan = {
+    created_at: new Date().toISOString(),
+    spotify_user: spotifyUser ? { id: spotifyUser.id, display_name: spotifyUser.display_name, country: spotifyUser.country } : null,
+    summary: {
+      unique_tracks: planTargets.reduce((sum, target) => sum + target.tracks.length, 0),
+      match_status_counts: counts,
+      playlists_to_create: 0,
+      pending_liked: pendingLiked,
+      pending_playlist_items: pendingPlaylistItems,
+    },
+    targets: planTargets,
+  };
+  saveJson(planPath, plan);
+  return plan;
+}
+
 async function runVerify(job) {
   if (!applied) throw new Error('还没有执行过写入。');
   const saved = await savedTrackUris();
@@ -1336,69 +1406,118 @@ async function routeApi(req, res, pathname, method) {
     const cache = loadMatchProgress(sourceKey);
     const spotifyPlaylists = await userPlaylists();
     const savedUris = await savedTrackUris();
-    const importedPlaylists = [];
-    let importedTracks = 0;
-    let remainingTracks = 0;
+    const playlistRows = [];
+    const totals = {
+      written: 0,
+      matched_not_written: 0,
+      matched: 0,
+      review: 0,
+      unmatched: 0,
+      uncached: 0,
+      remaining: 0,
+      source_total: 0,
+    };
     for (const sourcePlaylist of source.playlists || []) {
       const marker = markerFor(sourcePlaylist.id);
       const destination = spotifyPlaylists.find((p) =>
         String(p.description || '').includes(marker),
       );
-      if (!destination) continue;
-      let destinationUris;
-      try {
-        destinationUris = await playlistUris(destination.id);
-      } catch {
-        continue;
+      let destinationUris = new Set();
+      if (destination) {
+        try {
+          destinationUris = await playlistUris(destination.id);
+        } catch {
+          destinationUris = new Set();
+        }
       }
       const ids = [...new Set((sourcePlaylist.tracks || []).map((t) => String(t.id)))];
       let matched = 0;
-      let imported = 0;
+      let review = 0;
+      let unmatched = 0;
+      let uncached = 0;
+      let written = 0;
       for (const id of ids) {
         const result = cache.get(id);
-        if (result?.status === 'matched') matched += 1;
-        if (result?.match?.uri && destinationUris.has(result.match.uri)) imported += 1;
+        if (!result) uncached += 1;
+        else if (result.status === 'matched') matched += 1;
+        else if (result.status === 'review') review += 1;
+        else unmatched += 1;
+        if (result?.match?.uri && destinationUris.has(result.match.uri)) written += 1;
       }
-      importedTracks += imported;
-      remainingTracks += ids.length - imported;
-      importedPlaylists.push({
+      const matchedNotWritten = matched - written;
+      const remaining = ids.length - written;
+      totals.written += written;
+      totals.matched_not_written += matchedNotWritten;
+      totals.matched += matched;
+      totals.review += review;
+      totals.unmatched += unmatched;
+      totals.uncached += uncached;
+      totals.remaining += remaining;
+      totals.source_total += ids.length;
+      playlistRows.push({
         source_id: String(sourcePlaylist.id),
         source_name: sourcePlaylist.name,
-        destination_id: destination.id,
-        destination_name: destination.name,
-        destination_url: destination.external_urls?.spotify || '',
+        destination_id: destination?.id || null,
+        destination_name: destination?.name || null,
+        destination_url: destination?.external_urls?.spotify || '',
         source_total: ids.length,
-        source_matched: matched,
         spotify_items: destinationUris.size,
-        imported,
-        remaining: ids.length - imported,
+        matched,
+        review,
+        unmatched,
+        uncached,
+        written,
+        matched_not_written: matchedNotWritten,
+        remaining,
       });
     }
     const likedIds = [
       ...new Set((source.liked?.tracks || []).map((t) => String(t.id))),
     ];
     let likedImported = 0;
+    const likedCounts = { matched: 0, review: 0, unmatched: 0, uncached: 0 };
     for (const id of likedIds) {
       const result = cache.get(id);
+      if (!result) likedCounts.uncached += 1;
+      else if (result.status === 'matched') likedCounts.matched += 1;
+      else if (result.status === 'review') likedCounts.review += 1;
+      else likedCounts.unmatched += 1;
       if (result?.match?.uri && savedUris.has(result.match.uri)) likedImported += 1;
     }
+    const liked = {
+      imported: likedImported,
+      total: likedIds.length,
+      remaining: likedIds.length - likedImported,
+      matched_not_written: likedCounts.matched - likedImported,
+      ...likedCounts,
+    };
     return sendJson(res, 200, {
       summary: {
-        imported_playlists: importedPlaylists.length,
+        imported_playlists: playlistRows.filter((p) => p.destination_id).length,
         source_playlists: (source.playlists || []).length,
-        imported_tracks: importedTracks,
-        remaining_tracks: remainingTracks,
+        ...totals,
         liked_imported: likedImported,
         liked_total: likedIds.length,
         liked_remaining: likedIds.length - likedImported,
       },
-      liked: {
-        imported: likedImported,
-        total: likedIds.length,
-        remaining: likedIds.length - likedImported,
-      },
-      playlists: importedPlaylists.sort((a, b) => b.remaining - a.remaining),
+      liked,
+      playlists: playlistRows.sort(
+        (a, b) => b.remaining - a.remaining || b.matched_not_written - a.matched_not_written,
+      ),
     });
+  }
+  if (pathname === '/api/write-matched' && method === 'POST') {
+    const body = await readBody(req);
+    const selection = body.all ? null : Array.isArray(body.keys) ? body.keys.map(String) : [];
+    if (!body.all && !selection.length) {
+      return sendJson(res, 400, { error: '没有选择要写入的歌单。' });
+    }
+    const id = startJob('write-matched', async (job) => {
+      const generated = buildPlanFromCache(selection);
+      const applyResult = await runApply(job, true);
+      return { plan: generated.summary, apply: applyResult };
+    });
+    return sendJson(res, 202, { jobId: id });
   }
   if (pathname === '/api/netease/qr' && method === 'POST') {
     const key = await neteaseQrKey();

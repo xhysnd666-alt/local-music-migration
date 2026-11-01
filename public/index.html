@@ -266,10 +266,24 @@
             <span class="section-step">✓</span>
             <h2 data-i18n="imported.title">Spotify 导入进度</h2>
           </div>
-          <button id="refreshImportedBtn" class="btn subtle" data-i18n="imported.refresh">刷新进度</button>
+          <div class="row">
+            <button id="writeAllMatchedBtn" class="btn primary" data-i18n="imported.writeAll">写入全部已匹配</button>
+            <button id="refreshImportedBtn" class="btn subtle" data-i18n="imported.refresh">刷新进度</button>
+          </div>
         </div>
         <p class="hint" data-i18n="imported.hint">查看已经写入 Spotify 的歌单和曲目数量；点击“继续导入”可以把未完成歌单加入下一批。</p>
+        <div class="review-toolbar">
+          <label>
+            <span data-i18n="imported.filterLabel">显示范围</span>
+            <select id="importedFilter">
+              <option value="incomplete" data-i18n="imported.filterIncomplete">仅未完成</option>
+              <option value="ready" data-i18n="imported.filterReady">有可写入曲目</option>
+              <option value="all" data-i18n="imported.filterAll">全部歌单</option>
+            </select>
+          </label>
+        </div>
         <div id="importedSummary" class="plan-grid"></div>
+        <div id="importedProgress" class="progress hidden"></div>
         <div id="importedList" class="imported-list"></div>
       </section>
 

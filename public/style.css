@@ -866,6 +866,16 @@ select:focus, input:focus {
   color: var(--muted);
   font-size: 11px;
 }
+.imported-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.imported-actions .btn {
+  padding: 7px 10px;
+  font-size: 12px;
+}
 .track-status {
   padding: 2px 7px;
   border-radius: 999px;
@@ -1121,5 +1131,5 @@ code {
   .review-item { grid-template-columns: 1fr; }
   .review-toolbar { align-items: stretch; flex-direction: column; }
   .imported-row { grid-template-columns: 1fr auto; }
-  .imported-row .continue-import { grid-column: 1 / -1; justify-self: start; }
+  .imported-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }

@@ -41,6 +41,8 @@ Use confidence filters in “Tracks to review”: 75%+ is usually safe for bulk 
 
 “Spotify import progress” shows created playlists and remaining track counts. Click “Continue” to add the source playlist to the next batch.
 
+Each playlist shows matched, review, unmatched, uncached, written, and matched-but-unwritten counts. Write a playlist's matched tracks individually or use “Write all matched”.
+
 ## Troubleshooting
 
 **Spotify 429**

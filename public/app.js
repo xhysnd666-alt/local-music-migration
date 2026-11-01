@@ -165,9 +165,29 @@ const I18N = {
     en: "See what has already been written to Spotify. Click “Continue” to add an incomplete playlist to the next batch.",
   },
   "imported.refresh": { zh: "刷新进度", en: "Refresh progress" },
+  "imported.writeAll": { zh: "写入全部已匹配", en: "Write all matched" },
+  "imported.filterLabel": { zh: "显示范围", en: "Show" },
+  "imported.filterIncomplete": { zh: "仅未完成", en: "Incomplete only" },
+  "imported.filterReady": { zh: "有可写入曲目", en: "Ready to write" },
+  "imported.filterAll": { zh: "全部歌单", en: "All playlists" },
   "imported.playlists": { zh: "已导入歌单", en: "Imported playlists" },
   "imported.tracks": { zh: "已导入曲目", en: "Imported tracks" },
   "imported.remaining": { zh: "待补充曲目", en: "Tracks remaining" },
+  "imported.written": { zh: "已写入", en: "Written" },
+  "imported.matchedNotWritten": { zh: "已匹配待写入", en: "Matched, not written" },
+  "imported.reviewCount": { zh: "待确认", en: "Review" },
+  "imported.notMatched": { zh: "未匹配", en: "Not matched" },
+  "imported.rowDetail": {
+    zh: "已匹配 {matched} · 待确认 {review} · 未匹配 {unmatched}",
+    en: "Matched {matched} · review {review} · unmatched {unmatched}",
+  },
+  "imported.writeMatched": { zh: "写入已匹配", en: "Write matched" },
+  "imported.noRows": { zh: "当前筛选下没有歌单", en: "No playlists match this filter" },
+  "imported.confirmAll": {
+    zh: "将把所有歌单和 Liked Songs 中已匹配但未写入的曲目写入 Spotify，继续吗？",
+    en: "Write every matched but unwritten track to Spotify, including Liked Songs?",
+  },
+  "imported.writeDone": { zh: "已匹配曲目写入完成", en: "Matched tracks written" },
   "imported.liked": { zh: "Liked Songs", en: "Liked Songs" },
   "imported.source": { zh: "源歌单", en: "Source" },
   "imported.progress": { zh: "{imported}/{total}", en: "{imported}/{total}" },
@@ -877,6 +897,7 @@ let reviewLoading = false;
 let reviewSearchTimer = null;
 let importedLoaded = false;
 let importedLoading = false;
+let importedData = null;
 
 function reviewScoreRange() {
   const [minScore, maxScore] = ($("reviewScoreFilter")?.value || "0-1")
@@ -1033,49 +1054,112 @@ async function loadImported() {
   if (importedLoading) return;
   importedLoading = true;
   try {
-    const data = await api("/api/spotify/imported");
-    const s = data.summary || {};
-    $("importedSummary").innerHTML = `
-      <div class="plan-stat"><b>${Number(s.imported_playlists || 0).toLocaleString("en-US")}</b><span>${t("imported.playlists")}</span></div>
-      <div class="plan-stat"><b>${Number(s.imported_tracks || 0).toLocaleString("en-US")}</b><span>${t("imported.tracks")}</span></div>
-      <div class="plan-stat"><b>${Number(s.remaining_tracks || 0).toLocaleString("en-US")}</b><span>${t("imported.remaining")}</span></div>
-      <div class="plan-stat"><b>${Number(s.liked_imported || 0).toLocaleString("en-US")}</b><span>${t("imported.liked")} ${t("imported.progress", { imported: s.liked_imported || 0, total: s.liked_total || 0 })}</span></div>`;
-    const rows = data.playlists || [];
-    if (!rows.length) {
-      $("importedList").innerHTML = `<div class="playlist-empty">${t("imported.empty")}</div>`;
-    } else {
-      $("importedList").innerHTML = rows
-        .map((row) => {
-          const pct = row.source_total ? Math.round((row.imported / row.source_total) * 100) : 0;
-          return `
-          <div class="imported-row">
-            <div class="imported-main">
-              <b>${escapeHtml(row.destination_name)}</b>
-              <span>${t("imported.source")}: ${escapeHtml(row.source_name)}</span>
-              <div class="imported-bar"><i style="width:${pct}%"></i></div>
-            </div>
-            <div class="imported-count">
-              <b>${t("imported.progress", { imported: row.imported, total: row.source_total })}</b>
-              <span>${row.remaining ? t("imported.remainingLabel", { count: row.remaining }) : t("imported.complete")}</span>
-            </div>
-            <button class="btn subtle continue-import" data-key="playlist:${escapeHtml(row.source_id)}">${t("imported.continue")}</button>
-          </div>`;
-        })
-        .join("");
-      $("importedList").querySelectorAll(".continue-import").forEach((button) => {
-        button.addEventListener("click", () => {
-          selectedPlaylists.add(button.dataset.key);
-          saveSelectedPlaylists();
-          renderExportedList();
-          $("card-exported").scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      });
-    }
+    importedData = await api("/api/spotify/imported");
+    renderImported();
     importedLoaded = true;
   } catch (err) {
     log(t("log.loadStateFailed", { error: err.message }));
   } finally {
     importedLoading = false;
+  }
+}
+
+function renderImported() {
+  if (!importedData) return;
+  const s = importedData.summary || {};
+  $("importedSummary").innerHTML = `
+    <div class="plan-stat"><b>${Number(s.written || 0).toLocaleString("en-US")}</b><span>${t("imported.written")}</span></div>
+    <div class="plan-stat"><b>${Number(s.matched_not_written || 0).toLocaleString("en-US")}</b><span>${t("imported.matchedNotWritten")}</span></div>
+    <div class="plan-stat"><b>${Number(s.review || 0).toLocaleString("en-US")}</b><span>${t("imported.reviewCount")}</span></div>
+    <div class="plan-stat"><b>${Number((s.unmatched || 0) + (s.uncached || 0)).toLocaleString("en-US")}</b><span>${t("imported.notMatched")}</span></div>`;
+  const liked = importedData.liked || {};
+  const rows = [
+    {
+      key: "liked",
+      source_id: "liked",
+      source_name: t("exported.liked"),
+      destination_name: "Spotify Liked Songs",
+      source_total: liked.total || 0,
+      matched: liked.matched || 0,
+      review: liked.review || 0,
+      unmatched: (liked.unmatched || 0) + (liked.uncached || 0),
+      written: liked.imported || 0,
+      matched_not_written: liked.matched_not_written || 0,
+      remaining: liked.remaining || 0,
+    },
+    ...(importedData.playlists || []).map((row) => ({
+      ...row,
+      key: `playlist:${row.source_id}`,
+    })),
+  ];
+  const filter = $("importedFilter")?.value || "incomplete";
+  const filtered = rows.filter((row) => {
+    if (filter === "all") return true;
+    if (filter === "ready") return row.matched_not_written > 0;
+    return row.remaining > 0;
+  });
+  if (!filtered.length) {
+    $("importedList").innerHTML = `<div class="playlist-empty">${t("imported.noRows")}</div>`;
+    return;
+  }
+  $("importedList").innerHTML = filtered
+    .map((row) => {
+      const pct = row.source_total ? Math.round((row.written / row.source_total) * 100) : 0;
+      return `
+        <div class="imported-row">
+          <div class="imported-main">
+            <b>${escapeHtml(row.source_name)}</b>
+            <span>${row.destination_name ? escapeHtml(row.destination_name) : t("imported.source") + ": " + escapeHtml(row.source_name)}</span>
+            <span>${t("imported.rowDetail", {
+              matched: row.matched || 0,
+              review: row.review || 0,
+              unmatched: row.unmatched || 0,
+            })}</span>
+            <div class="imported-bar"><i style="width:${pct}%"></i></div>
+          </div>
+          <div class="imported-count">
+            <b>${t("imported.progress", { imported: row.written || 0, total: row.source_total || 0 })}</b>
+            <span>${row.matched_not_written ? `${t("imported.matchedNotWritten")}: ${row.matched_not_written}` : ""}</span>
+            <span>${row.remaining ? t("imported.remainingLabel", { count: row.remaining }) : t("imported.complete")}</span>
+          </div>
+          <div class="imported-actions">
+            ${row.matched_not_written ? `<button class="btn primary write-this" data-key="${escapeHtml(row.key)}">${t("imported.writeMatched")}</button>` : ""}
+            ${row.remaining ? `<button class="btn subtle continue-import" data-key="${escapeHtml(row.key)}">${t("imported.continue")}</button>` : ""}
+          </div>
+        </div>`;
+    })
+    .join("");
+  $("importedList").querySelectorAll(".continue-import").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedPlaylists.add(button.dataset.key);
+      saveSelectedPlaylists();
+      renderExportedList();
+      $("card-exported").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+  $("importedList").querySelectorAll(".write-this").forEach((button) => {
+    button.addEventListener("click", () => startWriteMatched([button.dataset.key], button));
+  });
+}
+
+async function startWriteMatched(keys, button = null) {
+  if (button) button.disabled = true;
+  try {
+    const body = keys ? { keys } : { all: true };
+    const { jobId } = await api("/api/write-matched", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    await pollJob(jobId, $("importedProgress"), (result) => {
+      log(t("imported.writeDone"));
+      show($("importedProgress"), false);
+    });
+    importedLoaded = false;
+    await refreshState();
+  } catch (err) {
+    log(err.message);
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
@@ -1234,6 +1318,11 @@ $('refreshPlanBtn').addEventListener('click', async () => {
 $('refreshImportedBtn').addEventListener('click', async () => {
   importedLoaded = false;
   await loadImported();
+});
+$('importedFilter').addEventListener('change', renderImported);
+$('writeAllMatchedBtn').addEventListener('click', () => {
+  if (!confirm(t("imported.confirmAll"))) return;
+  startWriteMatched(null, $('writeAllMatchedBtn'));
 });
 $('applyBtn').addEventListener('click', startApply);
 $('verifyBtn').addEventListener('click', startVerify);

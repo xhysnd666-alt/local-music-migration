@@ -68,6 +68,8 @@ The “Tracks to review” panel supports confidence filters. High-confidence it
 
 The “Spotify import progress” panel lists playlists already created in Spotify, with imported/source counts and remaining tracks. Click “Continue” to add that source playlist to the next batch.
 
+The same panel shows matched, review, unmatched, uncached, written, and matched-but-unwritten counts per playlist. Write one playlist's matched tracks individually, or use “Write all matched” for a global backfill.
+
 ## Data and security
 
 - `data/` stores local authorization state and exported data and is excluded by `.gitignore`.
