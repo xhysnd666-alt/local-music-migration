@@ -870,9 +870,11 @@ async function runMatch(job, delay, selection = null, maxTracks = 700) {
   return plan.summary;
 }
 
-async function saveLikedTracks(ids) {
-  for (let i = 0; i < ids.length; i += 50) {
-    await spotifyRequest('PUT', '/me/tracks', { ids: ids.slice(i, i + 50).join(',') });
+async function saveLikedTracks(uris) {
+  for (let i = 0; i < uris.length; i += 20) {
+    await spotifyRequest('PUT', '/me/library', {
+      uris: uris.slice(i, i + 20).join(','),
+    });
   }
 }
 
@@ -962,9 +964,9 @@ async function runApply(job, allowPartial = false) {
         }
         done += 1;
       }
-      const ids = pending.map((t) => t.match.id).filter(Boolean);
-      if (ids.length) await saveLikedTracks(ids);
-      summary.liked_saved += ids.length;
+      const uris = pending.map((t) => t.destination_uri).filter(Boolean);
+      if (uris.length) await saveLikedTracks(uris);
+      summary.liked_saved += uris.length;
       for (const t of pending) t.apply_status = 'saved_to_liked';
       job.progress = { done, total, message: `已保存喜欢歌曲 ${summary.liked_saved} 首` };
     } else {
